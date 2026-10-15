@@ -1,4 +1,4 @@
-// dmx-scene-box: recall static DMX scenes on a laser from a TM1638 LED&KEY panel.
+// minidesk: recall static DMX scenes on a laser from a TM1638 LED&KEY panel.
 //
 // Safety model (see CLAUDE.md): boot into BLANK, stream DMX continuously,
 // button 8 is always BLANK, anything unexpected -> BLANK and say why.
@@ -151,7 +151,7 @@ static void pollPanel(uint32_t now) {
     Serial.println("[panel] fault cleared (staying in current state)");
   }
 
-  const uint8_t action = pickAction(pressed);
+  const uint8_t action = pickAction(pressed, debouncer.held());
   if (action == kBlankButton) {
     goBlank("button");
   } else if (action) {

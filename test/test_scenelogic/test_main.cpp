@@ -134,10 +134,25 @@ void test_debounce_flags_disconnected_panel() {
 }
 
 void test_pick_action_blank_wins() {
-  TEST_ASSERT_EQUAL_UINT8(8, pickAction(0x81));
-  TEST_ASSERT_EQUAL_UINT8(1, pickAction(0x01));
-  TEST_ASSERT_EQUAL_UINT8(3, pickAction(0x0C));
-  TEST_ASSERT_EQUAL_UINT8(0, pickAction(0x00));
+  TEST_ASSERT_EQUAL_UINT8(8, pickAction(0x81, 0x81));
+  TEST_ASSERT_EQUAL_UINT8(1, pickAction(0x01, 0x01));
+  TEST_ASSERT_EQUAL_UINT8(3, pickAction(0x0C, 0x0C));
+  TEST_ASSERT_EQUAL_UINT8(0, pickAction(0x00, 0x00));
+  TEST_ASSERT_EQUAL_UINT8(0, pickAction(0x00, 0x80));  // BLANK held, nothing new
+  TEST_ASSERT_EQUAL_UINT8(2, pickAction(0x02, 0x03));  // scene 1 held, press 2
+}
+
+// Holding BLANK and then brushing a scene button must not fire the laser.
+void test_scene_press_while_blank_held_stays_blank() {
+  ButtonDebouncer d(3);
+  uint8_t action = 0;
+  for (int i = 0; i < 3; ++i) action = pickAction(d.update(0x80), d.held());
+  TEST_ASSERT_EQUAL_UINT8(8, action);
+  for (int i = 0; i < 3; ++i) {
+    action = pickAction(d.update(0x81), d.held());
+    TEST_ASSERT_NOT_EQUAL(1, action);
+  }
+  TEST_ASSERT_EQUAL_UINT8(8, action);  // the press re-asserted BLANK
 }
 
 void test_display_text_is_eight_chars() {
@@ -164,6 +179,7 @@ int main(int, char**) {
   RUN_TEST(test_debounce_needs_stable_reads);
   RUN_TEST(test_debounce_flags_disconnected_panel);
   RUN_TEST(test_pick_action_blank_wins);
+  RUN_TEST(test_scene_press_while_blank_held_stays_blank);
   RUN_TEST(test_display_text_is_eight_chars);
   return UNITY_END();
 }

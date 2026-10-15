@@ -1,7 +1,7 @@
 {
   "name": "scenelogic",
   "version": "1.0.0",
-  "description": "Hardware-free scene parsing, button debouncing and display text for dmx-scene-box",
+  "description": "Hardware-free scene parsing, button debouncing and display text for minidesk",
   "platforms": "*",
   "frameworks": "*",
   "dependencies": {

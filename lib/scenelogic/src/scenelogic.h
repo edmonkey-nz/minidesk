@@ -1,4 +1,4 @@
-// scenelogic: everything in the scene box that doesn't touch hardware.
+// scenelogic: everything in minidesk that doesn't touch hardware.
 // Built for both the ESP32-C3 and the host (pio test -e native), so keep it
 // free of Arduino.h and anything ESP-specific.
 #pragma once
@@ -72,9 +72,12 @@ class ButtonDebouncer {
   uint8_t faultStreak_ = 0;
 };
 
-// Which button to act on from a pressed-edge mask: 1..8, or 0 for none.
-// BLANK always wins; otherwise the lowest-numbered button.
-uint8_t pickAction(uint8_t pressedMask);
+// Which button to act on: 1..8, or 0 for none. `pressedMask` is this read's new
+// presses, `heldMask` everything currently held (ButtonDebouncer::held()).
+// BLANK always wins, including while it is held: any press with BLANK down
+// re-asserts BLANK, so brushing a scene button mid-panic can't fire the laser.
+// Otherwise the lowest-numbered new press.
+uint8_t pickAction(uint8_t pressedMask, uint8_t heldMask);
 
 // Exactly 8 display characters + NUL.
 void formatSceneText(char out[9], uint8_t button, const char* label);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert QLC+ workspace scenes into data/scenes.json for the DMX scene box.
+"""Convert QLC+ workspace scenes into data/scenes.json for minidesk.
 
 Name each QLC+ scene with its button number first: "1 Tunnel", "3-Fan sweep",
 "7: Slow spin". Buttons 1-7 only; button 8 is the hard-wired BLANK.

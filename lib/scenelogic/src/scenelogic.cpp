@@ -129,8 +129,9 @@ uint8_t ButtonDebouncer::update(uint8_t raw) {
   return 0;
 }
 
-uint8_t pickAction(uint8_t pressedMask) {
-  if (pressedMask & (1u << (kBlankButton - 1))) return kBlankButton;
+uint8_t pickAction(uint8_t pressedMask, uint8_t heldMask) {
+  if (!pressedMask) return 0;
+  if ((pressedMask | heldMask) & (1u << (kBlankButton - 1))) return kBlankButton;
   for (uint8_t i = 0; i < kNumButtons; ++i) {
     if (pressedMask & (1u << i)) return static_cast<uint8_t>(i + 1);
   }

@@ -1,4 +1,4 @@
-# dmx-scene-box — hard constraints
+# minidesk — hard constraints
 
 ESP32-C3 + TM1638 "LED&KEY" panel (8 buttons, 8 LEDs, 8× 7-seg) + TTL→RS485 module.
 Recalls static DMX scenes on a cheap dual-head DMX laser. Scenes are authored in
@@ -17,7 +17,8 @@ the safe failure state here is **BLANK**.
    (Run mode) 0–63 is undefined in the .qxf. **Unverified on hardware** — see below.
 3. **Button 8 is hard-wired BLANK.** It is never assignable to a scene, in firmware
    (`kBlankButton`) or converter (`BLANK_BUTTON`). BLANK wins over any other
-   simultaneous press.
+   simultaneous press, and while BLANK is held a scene press re-asserts BLANK
+   (`pickAction()` takes the held mask for this).
 4. **Invalid scenes are rejected whole, never partially applied.** A half-applied
    laser scene is an undefined state.
 5. **Any load failure → zero scenes → BLANK only**, with the reason on the display
@@ -98,9 +99,10 @@ Shared contract between `lib/scenelogic` (firmware) and `tools/qxw_to_scenes.py`
 - [ ] What the laser does on DMX signal loss (hold last / blank / auto mode).
 - [ ] RS485 auto-direction module gives glitch-free output for an hour, compared
       against the USB-DMX adaptor on the same scene.
-- [ ] LED&KEY board works reliably at 3V3 (brightness acceptable).
-- [ ] ESP32-C3 build with the pioarduino platform (scaffold was not compiled for the
-      target when written; host tests and converter tests pass).
+- [x] LED&KEY board works reliably at 3V3 (brightness acceptable). Bench-checked
+      2026-10-16: all 8 buttons, display, LEDs, and DIO-pull fault detection.
+- [x] ESP32-C3 build with the pioarduino platform (flashed and running 2026-10-16:
+      boots BLANK, DMX streaming, LittleFS mounts).
 
 ## Commands
 

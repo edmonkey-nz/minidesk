@@ -1,4 +1,4 @@
-# dmx-scene-box
+# minidesk
 
 A pocket DMX controller that recalls up to seven static scenes on a DMX laser, plus a hard-wired BLANK button.
 It's an ESP32-C3 with a TM1638 "LED&KEY" panel and a TTL-to-RS485 module. Scenes are authored in QLC+ and converted to a JSON file on the C3's flash.
