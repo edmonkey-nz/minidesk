@@ -1,0 +1,10 @@
+{
+  "name": "scenelogic",
+  "version": "1.0.0",
+  "description": "Hardware-free scene parsing, button debouncing and display text for dmx-scene-box",
+  "platforms": "*",
+  "frameworks": "*",
+  "dependencies": {
+    "bblanchon/ArduinoJson": "^7.2.0"
+  }
+}

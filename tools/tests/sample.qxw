@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Workspace>
+<Workspace xmlns="http://www.qlcplus.org/Workspace" CurrentWindow="FunctionManager">
+ <Creator>
+  <Name>Q Light Controller Plus</Name>
+  <Version>4.12.4</Version>
+  <Author>edmonkey</Author>
+ </Creator>
+ <Engine>
+  <InputOutputMap>
+   <Universe Name="Universe 1" ID="0">
+    <Output Plugin="DMX USB" Line="0"/>
+   </Universe>
+  </InputOutputMap>
+  <Fixture>
+   <Manufacturer>_unbranded</Manufacturer>
+   <Model>Dual head Laser</Model>
+   <Mode>Mode 1</Mode>
+   <ID>0</ID>
+   <Name>Dual head Laser</Name>
+   <Universe>0</Universe>
+   <Address>0</Address>
+   <Channels>10</Channels>
+  </Fixture>
+  <Fixture>
+   <Manufacturer>Generic</Manufacturer>
+   <Model>Generic</Model>
+   <Mode>4 Channel</Mode>
+   <ID>1</ID>
+   <Name>Spare dimmer</Name>
+   <Universe>0</Universe>
+   <Address>19</Address>
+   <Channels>4</Channels>
+  </Fixture>
+  <Function ID="0" Type="Scene" Name="1 Tunnel">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="0">0,64,1,200,2,150,7,40,8,0</FixtureVal>
+   <FixtureVal ID="1"/>
+  </Function>
+  <Function ID="1" Type="Scene" Name="2-Fan sweep">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="0">0,100,1,180,3,140</FixtureVal>
+   <FixtureVal ID="1">0,255</FixtureVal>
+  </Function>
+  <Function ID="2" Type="Scene" Name="Working scratch">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="0">0,64</FixtureVal>
+  </Function>
+  <Function ID="3" Type="Chaser" Name="5 Not a scene">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+  </Function>
+ </Engine>
+</Workspace>

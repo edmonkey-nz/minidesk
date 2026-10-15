@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE FixtureDefinition>
+<FixtureDefinition xmlns="http://www.qlcplus.org/FixtureDefinition">
+ <Creator>
+  <Name>Q Light Controller Plus</Name>
+  <Version>4.12.4</Version>
+  <Author>edmonkey</Author>
+ </Creator>
+ <Manufacturer>_unbranded</Manufacturer>
+ <Model>Dual head Laser</Model>
+ <Type>Laser</Type>
+ <Channel Name="Run mode">
+  <Group Byte="0">Effect</Group>
+  <Capability Min="64" Max="127">pattern control mode</Capability>
+  <Capability Min="128" Max="191">Self walking *controlled by CH2*</Capability>
+  <Capability Min="192" Max="255">Audio mode</Capability>
+ </Channel>
+ <Channel Name="Pattern">
+  <Group Byte="0">Gobo</Group>
+  <Capability Min="0" Max="127">Empty</Capability>
+  <Capability Min="128" Max="255">Pattern</Capability>
+ </Channel>
+ <Channel Name="Rotation">
+  <Group Byte="0">Effect</Group>
+  <Capability Min="0" Max="127">Rotation angle selction</Capability>
+  <Capability Min="128" Max="191">Clockwise rotate</Capability>
+  <Capability Min="192" Max="255">Counterclockwise rotate</Capability>
+ </Channel>
+ <Channel Name="Horz flip/turn">
+  <Group Byte="0">Pan</Group>
+  <Capability Min="0" Max="127">Position</Capability>
+  <Capability Min="128" Max="255">Speed</Capability>
+ </Channel>
+ <Channel Name="Vert flip/turn">
+  <Group Byte="0">Tilt</Group>
+  <Capability Min="0" Max="127">Position</Capability>
+  <Capability Min="128" Max="255">Speed</Capability>
+ </Channel>
+ <Channel Name="Pos/speed">
+  <Group Byte="0">Tilt</Group>
+  <Capability Min="0" Max="64">Hz postion</Capability>
+  <Capability Min="65" Max="127">Hz speed</Capability>
+  <Capability Min="128" Max="191">Vert position</Capability>
+  <Capability Min="192" Max="255">Vert speed</Capability>
+ </Channel>
+ <Channel Name="Up/down">
+  <Group Byte="0">Tilt</Group>
+  <Capability Min="0" Max="255"></Capability>
+ </Channel>
+ <Channel Name="Size">
+  <Group Byte="0">Gobo</Group>
+  <Capability Min="0" Max="127">Small to big</Capability>
+  <Capability Min="128" Max="191">Speed</Capability>
+  <Capability Min="192" Max="255">Scaling</Capability>
+ </Channel>
+ <Channel Name="Colour">
+  <Group Byte="0">Colour</Group>
+  <Capability Min="0" Max="127">Selection</Capability>
+  <Capability Min="128" Max="255">Changing speed</Capability>
+ </Channel>
+ <Channel Name="Misc">
+  <Group Byte="0">Intensity</Group>
+  <Capability Min="0" Max="127">SettingA</Capability>
+  <Capability Min="128" Max="255">SettingB</Capability>
+ </Channel>
+ <Mode Name="Mode 1">
+  <Channel Number="0">Run mode</Channel>
+  <Channel Number="1">Pattern</Channel>
+  <Channel Number="2">Rotation</Channel>
+  <Channel Number="3">Horz flip/turn</Channel>
+  <Channel Number="4">Vert flip/turn</Channel>
+  <Channel Number="5">Pos/speed</Channel>
+  <Channel Number="6">Up/down</Channel>
+  <Channel Number="7">Size</Channel>
+  <Channel Number="8">Colour</Channel>
+  <Channel Number="9">Misc</Channel>
+ </Mode>
+ <Physical>
+  <Bulb Type="" Lumens="0" ColourTemperature="0"/>
+  <Dimensions Weight="0" Width="0" Height="0" Depth="0"/>
+  <Lens Name="Other" DegreesMin="0" DegreesMax="0"/>
+  <Focus Type="Fixed" PanMax="0" TiltMax="0"/>
+  <Technical PowerConsumption="0" DmxConnector="5-pin"/>
+ </Physical>
+</FixtureDefinition>
