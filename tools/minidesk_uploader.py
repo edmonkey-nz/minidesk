@@ -60,8 +60,8 @@ How to use
 Install firmware is for a new box, or after a firmware update. It writes the scenes too.
 
 Why the laser must be off
-While the box is being written to, it stops sending DMX. What the laser does when DMX \
-stops hasn't been tested yet, and some lasers switch to auto mode."""
+While the box is being written to, it stops sending DMX. The Dual head Laser stops \
+when DMX stops (tested), but other lasers may switch to an auto mode instead."""
 
 
 class App(tk.Tk):

@@ -13,8 +13,8 @@ the safe failure state here is **BLANK**.
 
 1. **Boot into BLANK.** The DMX pin is driven high (idle) before anything else in
    `setup()`, and the first frame sent is BLANK.
-2. **BLANK = every slot 0.** Assumed to mean laser off because the fixture's CH1
-   (Run mode) 0–63 is undefined in the .qxf. **Unverified on hardware** — see below.
+2. **BLANK = every slot 0.** The fixture's CH1 (Run mode) 0–63 is undefined in the
+   .qxf; verified on hardware (2026-10-16) that all-zero stops the laser.
 3. **Button 8 is hard-wired BLANK.** It is never assignable to a scene, in firmware
    (`kBlankButton`) or converter (`BLANK_BUTTON`). BLANK wins over any other
    simultaneous press, and while BLANK is held a scene press re-asserts BLANK
@@ -112,18 +112,24 @@ Lessons from `../lightswing` (OLED.md there has the full story):
 
 ## Fixture notes (Dual-head-Laser2.qxf, 10 channels)
 
-- CH1 Run mode: 0–63 undefined (assumed off), 64–127 **pattern control mode —
+- CH1 Run mode: 0–63 undefined (all-zero tested: laser off), 64–127 **pattern control mode —
   scenes must use this range or CH2–10 are ignored**, 128–191 self-walking,
   192–255 audio mode.
 - Firmware and converter are fixture-agnostic on purpose; this rule lives here and
   in the README, not in code.
 
-## Unverified on hardware (resolve before trusting a show)
+## Hardware verification
 
-- [ ] CH1 = 0 actually blanks the laser.
-- [ ] What the laser does on DMX signal loss (hold last / blank / auto mode).
+- [x] CH1 = 0 actually blanks the laser. Tested 2026-10-16: button 8 (BLANK, every
+      slot 0) stops it.
+- [x] What the laser does on DMX signal loss. Tested 2026-10-16: **it stops.** So the
+      gaps where the box sends nothing (flashing, a watchdog reboot, a pulled cable)
+      leave this laser dark. A different laser may not; keep the uploader's
+      "laser is off" checkbox.
 - [ ] RS485 auto-direction module gives glitch-free output for an hour, compared
-      against the USB-DMX adaptor on the same scene.
+      against the USB-DMX adaptor on the same scene. **Deferred by choice
+      (2026-10-16):** fine in use so far. If the laser glitches or jumps to another
+      mode, do this test, then swap to a MAX3485 with DE tied high.
 - [x] OLED status screen on this board: geometry (borrowed from lightswing),
       orientation, and survives a cold power-up. Checked 2026-10-16; DMX holds
       40 frames/s with it running, slowest push 10.2 ms.

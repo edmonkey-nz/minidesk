@@ -52,8 +52,8 @@ Power the C3 from USB-C. The laser has its own mains supply.
 7. **Flash the scenes:** `pio run -t uploadfs`. Firmware doesn't need rebuilding for scene changes.
 
 **Power off or unplug the laser before uploading, whichever way you do it.** The box
-stops sending DMX while it is being written to, and the laser's behaviour on DMX loss
-is still unverified.
+stops sending DMX while it is being written to. The Dual head Laser stops when DMX
+stops (tested), but another laser might switch to an auto mode instead.
 
 ## Uploader app
 
