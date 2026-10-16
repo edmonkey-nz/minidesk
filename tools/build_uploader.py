@@ -27,13 +27,17 @@ NAME = "minidesk-uploader"
 
 
 def git_version() -> str:
+    """The release tag (e.g. "v0.1.0") when building exactly a tag with no local
+    edits, otherwise "development build"."""
+    def git(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+
     try:
-        return subprocess.run(
-            ["git", "describe", "--tags", "--always", "--dirty"],
-            cwd=ROOT, capture_output=True, text=True, check=True,
-        ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
+        tag = git("describe", "--tags", "--exact-match")
+        clean = git("diff", "--quiet", "HEAD").returncode == 0  # tracked files only
+    except OSError:
+        return "development build"
+    return tag.stdout.strip() if tag.returncode == 0 and clean else "development build"
 
 
 def main() -> int:

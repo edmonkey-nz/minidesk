@@ -9,6 +9,7 @@ tools/build_uploader.py; also runs from source:
 """
 from __future__ import annotations
 
+import datetime
 import json
 import queue
 import sys
@@ -38,7 +39,8 @@ def bundled_firmware() -> Path | None:
 def build_info() -> str:
     try:
         info = json.loads((BUNDLE / "build_info.json").read_text())
-        return f"{info['version']} ({info['date']})"
+        built = datetime.date.fromisoformat(info["date"])
+        return f"{info['version']} · {built.day} {built:%b %Y}"
     except (OSError, ValueError, KeyError):
         return "running from source"
 
