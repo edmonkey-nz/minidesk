@@ -1,5 +1,18 @@
 {
   "version": 1,
-  "source": "placeholder - regenerate with tools/qxw_to_scenes.py",
-  "scenes": []
+  "source": "minidesk.qxw",
+  "scenes": [
+    {
+      "button": 1,
+      "label": "Eyes",
+      "name": "1 Eyes",
+      "values": [[33,64],[34,147],[35,120],[36,116],[37,114],[38,109],[39,109]]
+    },
+    {
+      "button": 2,
+      "label": "Lines",
+      "name": "2 Lines",
+      "values": [[33,64],[34,177],[35,120],[36,116],[37,153],[38,109],[39,109]]
+    }
+  ]
 }
