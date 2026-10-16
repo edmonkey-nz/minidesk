@@ -1,6 +1,6 @@
 # minidesk
 
-A pocket DMX controller that recalls up to seven static scenes on a DMX laser, plus a hard-wired BLANK button.
+A pocket DMX controller that recalls up to seven static scenes, plus a hard-wired BLANK button. It works with any DMX fixtures on one universe; it was built for (and is tested with) a dual-head DMX laser.
 It's an ESP32-C3 with a TM1638 "LED&KEY" panel and a TTL-to-RS485 module. Scenes are authored in QLC+ and converted to a JSON file on the C3's flash.
 
 ```
@@ -9,15 +9,15 @@ It's an ESP32-C3 with a TM1638 "LED&KEY" panel and a TTL-to-RS485 module. Scenes
  1 2 3 4 5 6 7 8 <- 1–7 scenes, 8 = BLANK
 ```
 
-Read `CLAUDE.md` for the hard constraints (laser safety, never block, pin rules).
+Read `CLAUDE.md` for the hard constraints (output safety, never block, pin rules).
 
 ## Parts
 
-- ESP32-C3 SuperMini (the 0.42" OLED variant works; the OLED is unused for now)
+- ESP32-C3 board with the onboard 0.42" OLED (a plain SuperMini works too, without the status screen)
 - TM1638 LED&KEY module (8 buttons, 8 LEDs, 8× 7-seg)
 - TTL to RS485 module (auto-direction type, e.g. ePartners TP2003), or a MAX3485 breakout
 - 2 × 10k resistors
-- 5-pin XLR female (or 3-pin plus an adaptor for the laser)
+- XLR female: 3-pin, or 5-pin if your fixtures use it (pins 1–3 are the same)
 
 
 ## Wiring
@@ -35,14 +35,16 @@ Read `CLAUDE.md` for the hard constraints (laser safety, never block, pin rules)
 | RS485 B− | XLR pin 2 (Data−) | swap A/B first if nothing responds |
 | — | RS485 Earth terminal | leave unconnected |
 
-Power the C3 from USB-C. The laser has its own mains supply.
+Power the C3 from USB-C. Fixtures have their own supplies.
 
 ## Making scenes
 
-1. **Install the fixture.** Copy `qlc/Dual-head-Laser2.qxf` into your QLC+ user fixtures folder (`~/.qlcplus/fixtures/` on Linux). Restart QLC+.
-2. **Patch the laser** in QLC+, with your USB-DMX adaptor as the output on universe 1, at the address set on the laser.
-3. **Build scenes while watching the laser.** Name each with its button number first: `1 Tunnel`, `2 Fan sweep` and so on. Only buttons 1–7 can be used. Anything without a leading number is ignored, so scratch scenes are fine.
-   - Set CH1 (Run mode) to 64–127, "pattern control mode", in every scene, or the other channels are ignored.
+1. **Fixture definitions.** If QLC+ doesn't already know a fixture, put its `.qxf` in `qlc/fixtures/` and copy it into your QLC+ user fixtures folder (`~/.qlcplus/fixtures/` on Linux; see the QLC+ docs for Windows and macOS). Restart QLC+.
+2. **Patch your fixtures** in QLC+ on universe 1, at the addresses set on the fixtures, with your USB-DMX adaptor as the output.
+3. **Build scenes while watching the fixtures.** Name each with its button number first: `1 Tunnel`, `2 Warm wash` and so on. Only buttons 1–7 can be used. Anything without a leading number is ignored, so scratch scenes are fine.
+   - **Set every channel the look needs.** Channels a scene doesn't set are sent as 0, so include mode, shutter and master-dimmer channels.
+   - **Only the stored scene values are sent.** QLC+'s grand master, channel modifiers and fades aren't. Build looks with the grand master at full.
+   - Per-fixture tips are in `CLAUDE.md` under "Fixture notes". For example, the Dual head Laser needs CH1 (Run mode) at 64–127, or it ignores its other channels.
 4. **Save the workspace** into `qlc/`, e.g. `qlc/show.qxw`.
 5. **Upload** with the uploader app (below), or by hand with steps 6 and 7.
 6. **Convert:**
@@ -52,14 +54,15 @@ Power the C3 from USB-C. The laser has its own mains supply.
    This prints a summary and refuses to write anything if there are errors (duplicate buttons, button 8, address clashes, universe 2+).
 7. **Flash the scenes:** `pio run -t uploadfs`. Firmware doesn't need rebuilding for scene changes.
 
-**Power off or unplug the laser before uploading, whichever way you do it.** The box
-stops sending DMX while it is being written to. The Dual head Laser stops when DMX
-stops (tested), but another laser might switch to an auto mode instead.
+**Make sure your fixtures are safe when DMX stops before uploading, whichever way you
+do it.** The box sends no DMX while it is being written to. Fixtures react
+differently: some go dark (the Dual head Laser does), some hold their last look, and
+some start an auto or sound mode. Power lasers off unless you've tested them.
 
 ## Uploader app
 
 `minidesk-uploader` is a small window for Linux, Windows and macOS: choose the `.qxw`,
-check the scene list, tick "laser is off", press **Upload scenes**. It runs the same
+check the scene list, tick "fixtures are safe if DMX stops", press **Upload scenes**. It runs the same
 converter, refuses to upload if there are errors, finds the box on USB by itself, and
 reads the box's boot log afterwards to confirm how many scenes it loaded.
 **Install firmware + scenes** sets up a new box; no PlatformIO needed.
@@ -127,13 +130,16 @@ Every one of these leaves the box in BLANK.
 
 The decimal point on the last digit and the onboard LED blink only while DMX frames are actually going out.
 
-## Bench test before trusting it
+## New fixture checklist
 
-1. Send a scene from QLC+ through the USB-DMX adaptor and note exactly what the laser does.
-2. Send the same scene from the box. The behaviour should be identical.
-3. Run a scene for an hour, ideally one with lots of channels at 255, and watch for glitches or jumps to auto mode. If you see any, swap the RS485 module for a MAX3485 with DE tied high.
-4. Check that BLANK really blanks.
-5. Unplug the DMX cable while a scene is running and note what the laser does. Record it in `CLAUDE.md`.
+Do this once for each new fixture before trusting it in a show:
+
+1. Send a scene from QLC+ through the USB-DMX adaptor, then the same scene from the box. They should look identical.
+2. **Press 8 (BLANK).** Every channel goes to 0. Check that's actually dark for this fixture: moving heads swing to pan/tilt home, and some fixtures pick an auto or sound mode at 0.
+3. **Pull the DMX cable while a scene is running**, and note whether the fixture goes dark, holds, or starts an auto mode.
+4. Record the results in `CLAUDE.md` under "Fixture notes".
+
+If output ever glitches or a fixture jumps to another mode, run a scene for an hour against the USB-DMX adaptor. If the glitches show up there too, swap the RS485 module for a MAX3485 with DE tied high.
 
 ## Development
 

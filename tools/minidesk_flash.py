@@ -12,7 +12,8 @@ Scenes go into the box's LittleFS partition as /scenes.json, the same file
 The partition is found by reading the box's own partition table, not hard-coded.
 
 Nothing is written if the workspace has errors. DMX stops while the box is in its
-bootloader, so the laser must be off or unplugged (see CLAUDE.md).
+bootloader, so fixtures must be safe without DMX: off, unplugged, or tested to go
+dark (see CLAUDE.md, "Fixture notes").
 """
 from __future__ import annotations
 
@@ -292,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("workspace", nargs="?", type=Path, help="QLC+ workspace (.qxw)")
     ap.add_argument("--port", help="serial port (default: the one Espressif device found)")
     ap.add_argument("--firmware", type=Path, help="also install this merged firmware image (firmware.factory.bin)")
-    ap.add_argument("--yes", action="store_true", help="don't ask to confirm the laser is off")
+    ap.add_argument("--yes", action="store_true", help="don't ask to confirm fixtures are safe without DMX")
     ap.add_argument("--list-ports", action="store_true")
     args = ap.parse_args(argv)
 
@@ -316,7 +317,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         port = _pick_port(args.port)
         if not args.yes:
-            ans = input(f"Upload to {port}. DMX stops while flashing. Is the laser off or unplugged? [y/N] ")
+            ans = input(
+                f"Upload to {port}. DMX stops while flashing. "
+                "Are the fixtures safe without DMX (off, unplugged, or tested)? [y/N] "
+            )
             if ans.strip().lower() not in ("y", "yes"):
                 print("cancelled")
                 return 1

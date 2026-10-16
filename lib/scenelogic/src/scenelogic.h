@@ -91,7 +91,7 @@ class ButtonDebouncer {
 // Which button to act on: 1..8, or 0 for none. `pressedMask` is this read's new
 // presses, `heldMask` everything currently held (ButtonDebouncer::held()).
 // BLANK always wins, including while it is held: any press with BLANK down
-// re-asserts BLANK, so brushing a scene button mid-panic can't fire the laser.
+// re-asserts BLANK, so brushing a scene button mid-panic can't start a scene.
 // Otherwise the lowest-numbered new press.
 uint8_t pickAction(uint8_t pressedMask, uint8_t heldMask);
 

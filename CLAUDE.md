@@ -1,26 +1,31 @@
 # minidesk — hard constraints
 
 ESP32-C3 + TM1638 "LED&KEY" panel (8 buttons, 8 LEDs, 8× 7-seg) + TTL→RS485 module.
-Recalls static DMX scenes on a cheap dual-head DMX laser. Scenes are authored in
-QLC+ and converted to `data/scenes.json` by `tools/qxw_to_scenes.py`.
+Recalls static DMX scenes on any fixtures patched on universe 1. Scenes are authored
+in QLC+ and converted to `data/scenes.json` by `tools/qxw_to_scenes.py`. Firmware and
+converter are fixture-agnostic on purpose: per-fixture knowledge lives in
+"Fixture notes" below and in the README, never in code.
 
 Use NZ/British spelling in code comments, docs and UI text.
 
-## Laser safety (non-negotiable)
+## Output safety (non-negotiable)
 
-This drives a laser. These rules override "never fail dark" from general practice:
-the safe failure state here is **BLANK**.
+Write every rule as if the output drives a laser: the box was built for one, and a
+laser is the worst case. These rules override "never fail dark" from general
+practice: the safe failure state here is **BLANK**.
 
 1. **Boot into BLANK.** The DMX pin is driven high (idle) before anything else in
    `setup()`, and the first frame sent is BLANK.
-2. **BLANK = every slot 0.** The fixture's CH1 (Run mode) 0–63 is undefined in the
-   .qxf; verified on hardware (2026-10-16) that all-zero stops the laser.
+2. **BLANK = every slot 0.** That is dark for the fixtures tested so far (see
+   "Fixture notes") and for most dimmers and PARs, but not universally: a moving head
+   homes its pan/tilt, and some fixtures pick an auto or sound mode at 0. Check each
+   new fixture; don't add per-fixture BLANK values to the firmware.
 3. **Button 8 is hard-wired BLANK.** It is never assignable to a scene, in firmware
    (`kBlankButton`) or converter (`BLANK_BUTTON`). BLANK wins over any other
    simultaneous press, and while BLANK is held a scene press re-asserts BLANK
    (`pickAction()` takes the held mask for this).
 4. **Invalid scenes are rejected whole, never partially applied.** A half-applied
-   laser scene is an undefined state.
+   scene is an undefined state.
 5. **Any load failure → zero scenes → BLANK only**, with the reason on the display
    and serial. Never auto-format LittleFS.
 6. **Panel fault → BLANK.** If button reads look like a disconnected panel
@@ -60,10 +65,10 @@ the safe failure state here is **BLANK**.
   GPIO 18/19 are USB.
 - RS485 module (ePartners TP2003) is an **auto-direction** board: it only drives the
   line when TX is low; mark/idle is held by bias resistors. At 250 kbaud this is
-  marginal. If the laser glitches, swap to a MAX3485/SP3485 breakout with DE tied
+  marginal. If output glitches, swap to a MAX3485/SP3485 breakout with DE tied
   high. No firmware change needed. RXD unconnected. Earth terminal unconnected.
 - DMX: XLR pin 1 → GND, pin 2 → B−, pin 3 → A+. Swap A/B first if no response.
-  The laser uses 5-pin XLR (pins 1–3 same as 3-pin).
+  Some fixtures (the Dual head Laser) use 5-pin XLR: pins 1–3 are the same as 3-pin.
 
 ## DMX driver
 
@@ -110,26 +115,30 @@ Lessons from `../lightswing` (OLED.md there has the full story):
 - Geometry (`include/oled_panel.h`): 72×40 glass at controller columns 28–99, rows
   24–63 unrotated. Build with `-D OLED_INVERTED=1` if the board is mounted upside down.
 
-## Fixture notes (Dual-head-Laser2.qxf, 10 channels)
+## Fixture notes
 
-- CH1 Run mode: 0–63 undefined (all-zero tested: laser off), 64–127 **pattern control mode —
-  scenes must use this range or CH2–10 are ignored**, 128–191 self-walking,
+Custom fixture definitions (`.qxf`) live in `qlc/fixtures/`. **Adding a fixture:**
+test BLANK (button 8) and DMX loss (pull the cable mid-scene) on it, then add a
+section here with the results.
+
+### Dual head Laser (`qlc/fixtures/Dual-head-Laser2.qxf`, 10 channels)
+
+- CH1 Run mode: 0–63 undefined (all-zero tested: off), 64–127 **pattern control
+  mode — scenes must use this range or CH2–10 are ignored**, 128–191 self-walking,
   192–255 audio mode.
-- Firmware and converter are fixture-agnostic on purpose; this rule lives here and
-  in the README, not in code.
+- BLANK (every slot 0) stops it. Tested 2026-10-16.
+- On DMX signal loss it **stops**. Tested 2026-10-16. So gaps where the box sends
+  nothing (flashing, a watchdog reboot, a pulled cable) leave it dark.
 
 ## Hardware verification
 
-- [x] CH1 = 0 actually blanks the laser. Tested 2026-10-16: button 8 (BLANK, every
-      slot 0) stops it.
-- [x] What the laser does on DMX signal loss. Tested 2026-10-16: **it stops.** So the
-      gaps where the box sends nothing (flashing, a watchdog reboot, a pulled cable)
-      leave this laser dark. A different laser may not; keep the uploader's
-      "laser is off" checkbox.
+Per-fixture results (BLANK, DMX loss) are under "Fixture notes". The uploader's
+"fixtures are safe if DMX stops" checkbox stays: not every fixture goes dark.
+
 - [ ] RS485 auto-direction module gives glitch-free output for an hour, compared
       against the USB-DMX adaptor on the same scene. **Deferred by choice
-      (2026-10-16):** fine in use so far. If the laser glitches or jumps to another
-      mode, do this test, then swap to a MAX3485 with DE tied high.
+      (2026-10-16):** fine in use so far. If output glitches or a fixture jumps to
+      another mode, do this test, then swap to a MAX3485 with DE tied high.
 - [x] OLED status screen on this board: geometry (borrowed from lightswing),
       orientation, and survives a cold power-up. Checked 2026-10-16; DMX holds
       40 frames/s with it running, slowest push 10.2 ms.
@@ -165,9 +174,10 @@ lib/scenelogic/          hardware-free logic: scene parsing, debounce, display t
 test/test_scenelogic/    Unity tests for scenelogic (native)
 tools/qxw_to_scenes.py   QLC+ workspace -> scenes.json
 tools/minidesk_flash.py  convert + write scenes (or firmware) over USB; CLI and app engine
-tools/minidesk_uploader.py  tkinter app (info pane, links, laser-off checkbox)
+tools/minidesk_uploader.py  tkinter app (info pane, links, "safe if DMX stops" gate)
 tools/build_uploader.py  PyInstaller packaging; CI: .github/workflows/release.yml
 tools/tests/             pytest + sample.qxw
-qlc/                     fixture definition and your QLC+ workspaces
+qlc/                     your QLC+ workspaces (.qxw)
+qlc/fixtures/            custom fixture definitions (.qxf) the workspaces use
 data/scenes.json         what gets flashed to LittleFS
 ```

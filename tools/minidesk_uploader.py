@@ -46,22 +46,24 @@ def build_info() -> str:
 
 
 INFO_TEXT = """\
-minidesk recalls up to seven static DMX scenes on a laser from an 8-button panel. \
-Button 8 is always BLANK.
+minidesk recalls up to seven static DMX scenes from an 8-button panel, for any \
+fixtures on universe 1. Button 8 is always BLANK: every channel at 0.
 
 How to use
-1. Build your scenes in QLC+. Name each one with its button number first: \
-"1 Tunnel", "2 Fan sweep". Buttons 1–7 only.
-2. Set CH1 (Run mode) to 64–127 in every scene, or the laser ignores the other channels.
+1. In QLC+, patch your fixtures on universe 1 and build a scene for each button. \
+Name each one with its button number first: "1 Tunnel", "2 Warm wash". Buttons 1–7 only.
+2. Set every channel a look needs, including mode, shutter and master-dimmer \
+channels. Channels a scene doesn't set are sent as 0.
 3. Save the workspace and choose the .qxw file here. Check the scene list.
-4. Plug the box in over USB. Power off or unplug the laser.
+4. Plug the box in over USB, and make sure your fixtures are safe if DMX stops.
 5. Upload scenes. The box restarts in BLANK and shows how many scenes it loaded.
 
 Install firmware is for a new box, or after a firmware update. It writes the scenes too.
 
-Why the laser must be off
-While the box is being written to, it stops sending DMX. The Dual head Laser stops \
-when DMX stops (tested), but other lasers may switch to an auto mode instead."""
+Why DMX stopping matters
+While the box is being written to, it sends no DMX. Some fixtures go dark, some \
+hold their last look, and some start an auto or sound mode. Power lasers off unless \
+you've tested what they do."""
 
 
 class App(tk.Tk):
@@ -138,11 +140,11 @@ class App(tk.Tk):
         self.port_box.bind("<<ComboboxSelected>>", lambda e: self._update_buttons())
         ttk.Button(row, text="Refresh", command=self.refresh_ports).grid(row=0, column=2, padx=(6, 0))
 
-        self.laser_var = tk.BooleanVar(value=False)
+        self.safe_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             f,
-            text="The laser is powered off or unplugged",
-            variable=self.laser_var,
+            text="Fixtures are safe if DMX stops (off, unplugged, or tested)",
+            variable=self.safe_var,
             command=self._update_buttons,
         ).grid(row=6, column=0, sticky="w", pady=(2, 6))
 
@@ -164,7 +166,7 @@ class App(tk.Tk):
 
     def _build_info(self, f: ttk.Frame) -> None:
         ttk.Label(f, text="minidesk", font=("TkDefaultFont", 16, "bold")).pack(anchor="w")
-        ttk.Label(f, text="DMX scene recall for a laser", foreground="#555").pack(anchor="w", pady=(0, 8))
+        ttk.Label(f, text="Static DMX scene recall", foreground="#555").pack(anchor="w", pady=(0, 8))
         ttk.Label(f, text=INFO_TEXT, wraplength=290, justify="left").pack(anchor="w")
 
         ttk.Separator(f).pack(fill="x", pady=10)
@@ -276,7 +278,7 @@ class App(tk.Tk):
             and self.converted is not None
             and self.converted.json_text is not None
             and self.selected_port() is not None
-            and self.laser_var.get()
+            and self.safe_var.get()
         )
         self.upload_btn.configure(state="normal" if ready else "disabled")
         self.install_btn.configure(state="normal" if ready and self.firmware else "disabled")

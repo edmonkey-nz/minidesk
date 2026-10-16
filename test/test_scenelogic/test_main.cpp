@@ -142,7 +142,7 @@ void test_pick_action_blank_wins() {
   TEST_ASSERT_EQUAL_UINT8(2, pickAction(0x02, 0x03));  // scene 1 held, press 2
 }
 
-// Holding BLANK and then brushing a scene button must not fire the laser.
+// Holding BLANK and then brushing a scene button must not start a scene.
 void test_scene_press_while_blank_held_stays_blank() {
   ButtonDebouncer d(3);
   uint8_t action = 0;

@@ -118,7 +118,7 @@ void OledStatus::render(const OledView& v) {
     panel_.fillRect(OFFSET_X + x, OFFSET_Y + y, w, h, SSD1306_WHITE);
   };
 
-  // Row 1: scene or status. Inverted while a scene is live, so "laser on" reads
+  // Row 1: scene or status. Inverted while a scene is live, so "output on" reads
   // at a glance.
   if (v.live) fill(0, 0, VISIBLE_WIDTH, 9);
   marquee(1, v.title, v.live ? SSD1306_BLACK : SSD1306_WHITE);

@@ -1,4 +1,4 @@
-// minidesk: recall static DMX scenes on a laser from a TM1638 LED&KEY panel.
+// minidesk: recall static DMX scenes from a TM1638 LED&KEY panel.
 //
 // Safety model (see CLAUDE.md): boot into BLANK, stream DMX continuously,
 // button 8 is always BLANK, anything unexpected -> BLANK and say why.
