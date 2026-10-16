@@ -22,6 +22,10 @@ Read `CLAUDE.md` for the hard constraints (output safety, never block, pin rules
 
 ## Wiring
 
+![Wiring diagram](docs/wiring.png)
+
+Source: [docs/wiring.html](docs/wiring.html) (re-render command at the top of the file).
+
 | From | To | Notes |
 |---|---|---|
 | C3 3V3 | TM1638 VCC, RS485 VCC | **3.3 V only for the TM1638** |
