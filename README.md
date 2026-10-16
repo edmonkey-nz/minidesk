@@ -19,6 +19,7 @@ Read `CLAUDE.md` for the hard constraints (laser safety, never block, pin rules)
 - 2 × 10k resistors
 - 5-pin XLR female (or 3-pin plus an adaptor for the laser)
 
+
 ## Wiring
 
 | From | To | Notes |
