@@ -44,6 +44,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--firmware", type=Path, default=ROOT / ".pio/build/c3/firmware.factory.bin")
     args = ap.parse_args()
+    # Absolute: PyInstaller resolves relative --add-data paths against --specpath
+    # (build/), not the current directory.
+    args.firmware = args.firmware.resolve()
 
     if not args.firmware.is_file():
         print(f"error: no firmware at {args.firmware}. Run `pio run -e c3` first.", file=sys.stderr)
