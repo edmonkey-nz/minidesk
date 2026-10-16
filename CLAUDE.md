@@ -84,6 +84,11 @@ Shared contract between `lib/scenelogic` (firmware) and `tools/qxw_to_scenes.py`
   together, update both parsers, update both test suites.
   `validate_document()` in the converter mirrors the firmware's `parseScenes()`
   rules; keep them in step.
+- `tools/minidesk_flash.py` (the uploader) mirrors firmware settings too:
+  `SCENES_MAX_BYTES` (include/config.h) and `LFS_CONFIG` (the Arduino-ESP32
+  `CONFIG_LITTLEFS_*` sdkconfig values). If the framework's LittleFS config changes,
+  the box will boot "FS Err" on uploaded images: re-check against the pio-built
+  `littlefs.bin` (`tools/tests/test_minidesk_flash.py` shows how).
 
 ## Fixture notes (Dual-head-Laser2.qxf, 10 channels)
 
@@ -115,6 +120,8 @@ pio test -e native               # host tests for lib/scenelogic
 python3 -m pytest tools/tests -q # converter tests
 python3 tools/qxw_to_scenes.py qlc/show.qxw -o data/scenes.json
 python3 tools/qxw_to_scenes.py --check data/scenes.json
+python3 tools/minidesk_flash.py qlc/show.qxw        # convert + upload over USB
+python3 tools/minidesk_uploader.py                  # same, as an app
 ```
 
 ## Layout
@@ -126,6 +133,9 @@ include/config.h         pins and tunables
 lib/scenelogic/          hardware-free logic: scene parsing, debounce, display text
 test/test_scenelogic/    Unity tests for scenelogic (native)
 tools/qxw_to_scenes.py   QLC+ workspace -> scenes.json
+tools/minidesk_flash.py  convert + write scenes (or firmware) over USB; CLI and app engine
+tools/minidesk_uploader.py  tkinter app (info pane, links, laser-off checkbox)
+tools/build_uploader.py  PyInstaller packaging; CI: .github/workflows/release.yml
 tools/tests/             pytest + sample.qxw
 qlc/                     fixture definition and your QLC+ workspaces
 data/scenes.json         what gets flashed to LittleFS

@@ -43,12 +43,44 @@ Power the C3 from USB-C. The laser has its own mains supply.
 3. **Build scenes while watching the laser.** Name each with its button number first: `1 Tunnel`, `2 Fan sweep` and so on. Only buttons 1–7 can be used. Anything without a leading number is ignored, so scratch scenes are fine.
    - Set CH1 (Run mode) to 64–127, "pattern control mode", in every scene, or the other channels are ignored.
 4. **Save the workspace** into `qlc/`, e.g. `qlc/show.qxw`.
-5. **Convert:**
+5. **Upload** with the uploader app (below), or by hand with steps 6 and 7.
+6. **Convert:**
    ```bash
    python3 tools/qxw_to_scenes.py qlc/show.qxw -o data/scenes.json
    ```
    This prints a summary and refuses to write anything if there are errors (duplicate buttons, button 8, address clashes, universe 2+).
-6. **Flash the scenes:** `pio run -t uploadfs`. Firmware doesn't need rebuilding for scene changes.
+7. **Flash the scenes:** `pio run -t uploadfs`. Firmware doesn't need rebuilding for scene changes.
+
+**Power off or unplug the laser before uploading, whichever way you do it.** The box
+stops sending DMX while it is being written to, and the laser's behaviour on DMX loss
+is still unverified.
+
+## Uploader app
+
+`minidesk-uploader` is a small window for Linux, Windows and macOS: choose the `.qxw`,
+check the scene list, tick "laser is off", press **Upload scenes**. It runs the same
+converter, refuses to upload if there are errors, finds the box on USB by itself, and
+reads the box's boot log afterwards to confirm how many scenes it loaded.
+**Install firmware + scenes** sets up a new box; no PlatformIO needed.
+
+Download it from the [releases page](https://github.com/edmonkey-nz/minidesk/releases).
+The builds aren't signed, so:
+
+- **Windows:** SmartScreen warns. Choose "More info", then "Run anyway".
+- **macOS:** unzip, then right-click the app and choose Open the first time. Apple silicon only.
+- **Linux:** `chmod +x minidesk-uploader-linux`. You need to be in the `dialout` group
+  (`sudo usermod -aG dialout $USER`, then log out and in).
+
+From source, or headless:
+
+```bash
+pip install -r tools/requirements-uploader.txt
+python3 tools/minidesk_uploader.py                 # the app
+python3 tools/minidesk_flash.py qlc/show.qxw       # same thing, command line
+```
+
+Releases are built by `.github/workflows/release.yml`: push a tag like `v1.0.0`.
+To build for your own OS: `pio run -e c3 && python3 tools/build_uploader.py` (needs `pyinstaller`).
 
 The display labels are the first 6 characters after the number. Seven-segment can't draw some letters well (M, W, K, X, V), so choose labels you can read.
 
@@ -92,5 +124,6 @@ The decimal point on the last digit and the onboard LED blink only while DMX fra
 ```bash
 pio run && pio run -t upload        # firmware
 pio test -e native                  # scene parsing/debounce tests on your PC
-python3 -m pytest tools/tests -q    # converter tests (pip install pytest)
+python3 -m pytest tools/tests -q    # converter + uploader tests (pip install pytest, plus
+                                    # tools/requirements-uploader.txt for the uploader ones)
 ```

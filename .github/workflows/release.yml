@@ -1,0 +1,76 @@
+# Builds the firmware once, then the uploader app on Linux, Windows and macOS with
+# that firmware bundled. Push a tag like v1.0.0 to publish a GitHub release;
+# run it by hand (Actions tab) to just get the builds as artifacts.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('platformio.ini') }}
+      - run: pip install platformio
+      - run: pio test -e native
+      - run: pio run -e c3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: .pio/build/c3/firmware.factory.bin
+
+  uploader:
+    needs: firmware
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.04 so the Linux build runs on older glibc too
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # git describe for the version shown in the app
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: fw
+      - run: pip install -r tools/requirements-uploader.txt pyinstaller pytest
+      - run: python -m pytest tools/tests -q
+      - run: python tools/build_uploader.py --firmware fw/firmware.factory.bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uploader-${{ matrix.os }}
+          path: |
+            dist/minidesk-uploader-linux
+            dist/minidesk-uploader-windows.exe
+            dist/minidesk-uploader-macos.zip
+          if-no-files-found: error
+
+  release:
+    needs: uploader
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true

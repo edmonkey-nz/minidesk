@@ -1,0 +1,5 @@
+# minidesk uploader (tools/minidesk_flash.py, tools/minidesk_uploader.py)
+# esptool is pinned: its Python API (esptool.cmds, the logger) is still moving.
+esptool==5.6.0
+littlefs-python==0.19.0
+pyserial==3.5
