@@ -84,6 +84,21 @@ To build for your own OS: `pio run -e c3 && python3 tools/build_uploader.py` (ne
 
 The display labels are the first 6 characters after the number. Seven-segment can't draw some letters well (M, W, K, X, V), so choose labels you can read.
 
+## OLED status screen
+
+The C3 board's little OLED shows what the box is doing, at 10 frames a second:
+
+```
+ 1 Eyes            <- scene name; white bar = a scene is live. Otherwise BLANK or a status
+ Dual head Laser   <- fixture (scrolls if long; cycles if there are several)
+ 33-42       40Hz  <- its DMX addresses, and DMX frames per second
+ ▌▌▌▌▌▌▌ _ _ _ ::  <- live value of each channel as it goes out | held buttons
+               -=- <-                                          | TX: sweeps while sending
+```
+
+Fixture names come from the QLC+ workspace, so re-convert older `scenes.json` files to
+get them. Without a fixture list it shows 12 channels from the first non-zero one.
+
 ## Boot messages
 
 | Display | Meaning |

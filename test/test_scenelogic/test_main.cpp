@@ -167,6 +167,47 @@ void test_display_text_is_eight_chars() {
   TEST_ASSERT_EQUAL_STRING("much too", out);
 }
 
+void test_names_and_fixtures_parsed() {
+  LoadReport r = parse(R"({"version":1,"scenes":[
+    {"button":1,"label":"Eyes","name":"1 Eyes\twith a very long name indeed","values":[[33,64]]}
+  ],"fixtures":[
+    {"name":"Dual head Laser","address":33,"channels":10},
+    {"name":"Bad","address":510,"channels":10},
+    {"name":42,"address":1,"channels":1},
+    {"name":"Dimmer","address":1,"channels":4}
+  ]})");
+  TEST_ASSERT_EQUAL_INT((int)LoadStatus::Ok, (int)r.status);
+  TEST_ASSERT_EQUAL_STRING("1 Eyeswith a very long n", set.scenes[1].name);  // tab dropped, 24 max
+  TEST_ASSERT_EQUAL_UINT8(2, set.fixtureCount);  // bad entries skipped, scenes unaffected
+  TEST_ASSERT_EQUAL_STRING("Dual head Laser", set.fixtures[0].name);
+  TEST_ASSERT_EQUAL_UINT16(33, set.fixtures[0].address);
+  TEST_ASSERT_EQUAL_UINT16(10, set.fixtures[0].channels);
+  TEST_ASSERT_EQUAL_STRING("Dimmer", set.fixtures[1].name);
+}
+
+void test_fixtures_optional_and_cleared() {
+  parse(R"({"version":1,"scenes":[],"fixtures":[{"name":"A","address":1,"channels":1}]})");
+  TEST_ASSERT_EQUAL_UINT8(1, set.fixtureCount);
+  LoadReport r = parse(R"({"version":1,"scenes":[{"button":1,"values":[[1,1]]}]})");
+  TEST_ASSERT_EQUAL_INT((int)LoadStatus::Ok, (int)r.status);
+  TEST_ASSERT_EQUAL_UINT8(0, set.fixtureCount);
+  TEST_ASSERT_EQUAL_STRING("", set.scenes[1].name);
+  r = parse(R"({"version":1,"scenes":[{"button":1,"values":[[1,1]]}],"fixtures":"junk"})");
+  TEST_ASSERT_EQUAL_UINT8(1, r.loaded);  // junk fixtures never reject scenes
+}
+
+void test_marquee_and_bars() {
+  TEST_ASSERT_EQUAL_INT16(0, marqueeOffset(60, 72, 123, 10));  // fits: never moves
+  TEST_ASSERT_EQUAL_INT16(0, marqueeOffset(90, 72, 5, 10));    // initial pause
+  TEST_ASSERT_EQUAL_INT16(-3, marqueeOffset(90, 72, 13, 10));  // scrolling
+  TEST_ASSERT_EQUAL_INT16(-18, marqueeOffset(90, 72, 33, 10)); // end pause, fully scrolled
+  TEST_ASSERT_EQUAL_INT16(0, marqueeOffset(90, 72, 38, 10));   // wrapped to start
+  TEST_ASSERT_EQUAL_UINT8(0, barHeight(0, 12));
+  TEST_ASSERT_EQUAL_UINT8(1, barHeight(1, 12));
+  TEST_ASSERT_EQUAL_UINT8(12, barHeight(255, 12));
+  TEST_ASSERT_EQUAL_UINT8(6, barHeight(128, 12));
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_parses_converter_output);
@@ -181,5 +222,8 @@ int main(int, char**) {
   RUN_TEST(test_pick_action_blank_wins);
   RUN_TEST(test_scene_press_while_blank_held_stays_blank);
   RUN_TEST(test_display_text_is_eight_chars);
+  RUN_TEST(test_names_and_fixtures_parsed);
+  RUN_TEST(test_fixtures_optional_and_cleared);
+  RUN_TEST(test_marquee_and_bars);
   return UNITY_END();
 }

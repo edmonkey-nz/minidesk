@@ -6,16 +6,19 @@
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <TM1638plus.h>
+#include <Wire.h>
 #include <scenelogic.h>
 
 #include "config.h"
 #include "dmx_tx.h"
+#include "oled_status.h"
 
 using namespace scenelogic;
 
 static DmxTx dmx;
 static TM1638plus panel(PIN_TM_STB, PIN_TM_CLK, PIN_TM_DIO, true /* high-freq MCU */);
-static SceneSet sceneSet;  // ~3.6 KB: static on purpose, not on the stack
+static OledStatus oled;
+static SceneSet sceneSet;  // ~4 KB: static on purpose, not on the stack
 static ButtonDebouncer debouncer(BUTTON_STABLE_READS);
 static LoadReport loadReport;
 
@@ -26,8 +29,9 @@ static uint8_t activeButton = kBlankButton;
 static bool panelFault = false;
 static uint32_t panelFaultSinceMs = 0;
 
-// Temporary message overlay
+// Temporary message overlay: 7-segment text, and plain text for the OLED
 static char msgText[9] = "";
+static char oledMsg[kNameMax + 1] = "";
 static uint32_t msgStartMs = 0;
 static uint32_t msgDurationMs = 0;
 
@@ -43,8 +47,9 @@ static void statusLed(bool on) {
   digitalWrite(PIN_STATUS_LED, (on != STATUS_LED_ACTIVE_LOW) ? HIGH : LOW);
 }
 
-static void showMessage(const char* text, uint32_t durationMs) {
+static void showMessage(const char* text, const char* oledText, uint32_t durationMs) {
   formatStatus(msgText, text);
+  snprintf(oledMsg, sizeof oledMsg, "%s", oledText);
   msgStartMs = millis();
   msgDurationMs = durationMs;
 }
@@ -58,9 +63,10 @@ static void goBlank(const char* reason) {
 static void goScene(uint8_t button) {
   const Scene& s = sceneSet.scenes[button];
   if (!s.present) {
-    char m[9];
-    snprintf(m, sizeof m, "%u EMPty", button);
-    showMessage(m, 1200);
+    char m[9], o[kNameMax + 1];
+    snprintf(m, sizeof m, "%u EMPty", button % 10u);
+    snprintf(o, sizeof o, "No scene on %u", button);
+    showMessage(m, o, 1200);
     Serial.printf("[scene] button %u has no scene, output unchanged\n", button);
     return;
   }
@@ -103,9 +109,9 @@ static const char* loadStatusText(char out[9]) {
   switch (loadReport.status) {
     case LoadStatus::Ok:
       if (loadReport.rejected) {
-        snprintf(out, 9, "%u ok %uEr", loadReport.loaded, loadReport.rejected);
+        snprintf(out, 9, "%u ok %uEr", loadReport.loaded % 10u, loadReport.rejected > 9 ? 9u : loadReport.rejected);
       } else {
-        snprintf(out, 9, "%u SCEnES", loadReport.loaded);
+        snprintf(out, 9, "%u SCEnES", loadReport.loaded % 10u);
       }
       break;
     case LoadStatus::Empty:      snprintf(out, 9, "0 SCEnES"); break;
@@ -113,6 +119,25 @@ static const char* loadStatusText(char out[9]) {
     case LoadStatus::BadFormat:  snprintf(out, 9, "FMt Err"); break;
     case LoadStatus::NoFile:     snprintf(out, 9, "no FILE"); break;
     case LoadStatus::FsError:    snprintf(out, 9, "FS Err"); break;
+  }
+  return out;
+}
+
+static const char* loadStatusOled(char out[kNameMax + 1]) {
+  const size_t n = kNameMax + 1;
+  switch (loadReport.status) {
+    case LoadStatus::Ok:
+      if (loadReport.rejected) {
+        snprintf(out, n, "%u scenes, %u bad", loadReport.loaded, loadReport.rejected);
+      } else {
+        snprintf(out, n, "%u scene%s loaded", loadReport.loaded, loadReport.loaded == 1 ? "" : "s");
+      }
+      break;
+    case LoadStatus::Empty:      snprintf(out, n, "No scenes in file"); break;
+    case LoadStatus::ParseError: snprintf(out, n, "Scenes: JSON error"); break;
+    case LoadStatus::BadFormat:  snprintf(out, n, "Scenes: bad format"); break;
+    case LoadStatus::NoFile:     snprintf(out, n, "No scenes file"); break;
+    case LoadStatus::FsError:    snprintf(out, n, "Filesystem error"); break;
   }
   return out;
 }
@@ -214,6 +239,72 @@ static void updateIndicators(uint32_t now) {
   writePanel(text, beat, leds);
 }
 
+// DMX frames per second, measured over each second. Logged once 5 s after boot,
+// with the slowest OLED push, as the never-block check.
+static uint16_t framesPerSec = 0;
+
+static void updateFrameRate(uint32_t now) {
+  static uint32_t lastMs = 0;
+  static uint32_t lastFrames = 0;
+  static bool reported = false;
+  if (now - lastMs < 1000) return;
+  const uint32_t f = dmx.framesSent();
+  framesPerSec = static_cast<uint16_t>((f - lastFrames) * 1000u / (now - lastMs));
+  lastMs = now;
+  lastFrames = f;
+  if (!reported && now >= 5000) {
+    reported = true;
+    Serial.printf("[dmx] %u frames/s; slowest OLED push %lu us\n", framesPerSec,
+                  static_cast<unsigned long>(oled.maxPushUs()));
+  }
+}
+
+static void updateOled(uint32_t now, bool frameJustStarted) {
+  OledView v;
+  char title[kNameMax + 1];
+  const Scene& sc = sceneSet.scenes[activeButton <= kMaxSceneButton ? activeButton : 0];
+  if (!dmx.ok()) {
+    v.title = "DMX INIT FAILED";
+  } else if (dmx.stalled()) {
+    v.title = "DMX STALLED";
+  } else if (panelFault) {
+    v.title = "PANEL FAULT";
+  } else if (now - msgStartMs < msgDurationMs) {
+    v.title = oledMsg;
+  } else if (activeButton == kBlankButton) {
+    v.title = "BLANK";
+  } else {
+    if (sc.name[0]) {
+      snprintf(title, sizeof title, "%s", sc.name);
+    } else {
+      snprintf(title, sizeof title, "%u %s", activeButton, sc.label);
+    }
+    v.title = title;
+  }
+  v.live = activeButton != kBlankButton;
+
+  const uint8_t* slots = dmx.slots();
+  if (sceneSet.fixtureCount) {
+    const FixtureInfo& f = sceneSet.fixtures[(now / OLED_FIXTURE_CYCLE_MS) % sceneSet.fixtureCount];
+    v.fixture = f.name;
+    v.firstAddress = f.address;
+    v.channelCount = f.channels;
+  } else {
+    // No fixture list (older scenes file): show 12 channels from the first non-zero.
+    uint16_t first = 1;
+    while (first <= kDmxSlots && slots[first - 1] == 0) ++first;
+    if (first > kDmxSlots - 11) first = first > kDmxSlots ? 1 : kDmxSlots - 11;
+    v.firstAddress = first;
+    v.channelCount = 12;
+  }
+  v.slots = slots;
+  v.framesPerSec = framesPerSec;
+  v.frames = dmx.framesSent();
+  v.heldButtons = debouncer.held();
+  v.panelFault = panelFault;
+  oled.service(now, frameJustStarted, v);
+}
+
 // ---------------------------------------------------------------------------
 
 void setup() {
@@ -245,15 +336,20 @@ void setup() {
   // 4. Scenes. Any failure leaves zero scenes loaded; we stay BLANK either way.
   loadScenes();
   logScenes();
-  char s[9];
-  showMessage(loadStatusText(s), BOOT_MESSAGE_MS);
+  char s[9], o[kNameMax + 1];
+  showMessage(loadStatusText(s), loadStatusOled(o), BOOT_MESSAGE_MS);
+
+  // 5. OLED, status only. Doesn't wait for the panel; the loop retries if it's absent.
+  Wire.begin(PIN_OLED_SDA, PIN_OLED_SCL, OLED_I2C_HZ);
+  Wire.setTimeOut(OLED_I2C_TIMEOUT_MS);
+  oled.begin(millis());
 
   enableLoopWDT();  // a hung loop reboots into BLANK
 }
 
 void loop() {
   const uint32_t now = millis();
-  dmx.service();
+  bool frameStarted = dmx.service();
 
   static uint32_t lastPollMs = 0;
   if (now - lastPollMs >= BUTTON_POLL_MS) {
@@ -261,6 +357,8 @@ void loop() {
     pollPanel(now);
   }
 
-  dmx.service();
+  frameStarted |= dmx.service();
   updateIndicators(now);
+  updateFrameRate(now);
+  updateOled(now, frameStarted);
 }

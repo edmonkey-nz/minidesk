@@ -35,6 +35,11 @@ the safe failure state here is **BLANK**.
   `loop()` is BREAK + MAB (~0.2 ms) in `DmxTx::service()`.
 - No `delay()` in `loop()`. No polling loops waiting on hardware.
 - Serial is USB CDC with `setTxTimeoutMs(0)`; log on events only, never per frame.
+- **OLED:** the visible 72×40 window (5 pages, ~9 ms of I2C) is pushed only right
+  after a DMX frame starts, while the UART drains the frame by interrupt. Never call
+  `display()` (a full push is ~25 ms). I2C timeout is 5 ms; a missing panel is probed
+  every 3 s and otherwise ignored. The boot log's `[dmx] N frames/s; slowest OLED
+  push N us` line is the check: ~40 frames/s, push well under 25 ms.
 - No WiFi/BLE in v1. If added later (field editing), it must not starve
   `dmx.service()`; measure frame rate before and after.
 
@@ -47,7 +52,7 @@ the safe failure state here is **BLANK**.
 | 10 | TM1638 DIO | **10k pull-up to 3V3**. DIO is open-drain on reads. The pull-up also makes a disconnected panel read 0xFF, which the debouncer detects as a fault. |
 | 7 | RS485 TXD | **10k pull-up to 3V3** so the line idles in mark during reset |
 | 8 | onboard LED | active low, DMX heartbeat |
-| 5/6 | onboard 0.42" OLED (I2C) | unused in v1 |
+| 5/6 | onboard 0.42" OLED (I2C SDA/SCL, 0x3C) | status display, `src/oled_status.*` |
 
 - **TM1638 panel powered from 3V3, never 5 V.** At 5 V its DIO pull-up would put
   5 V on a non-5 V-tolerant C3 pin.
@@ -80,6 +85,10 @@ Shared contract between `lib/scenelogic` (firmware) and `tools/qxw_to_scenes.py`
 - `button` 1–7. `values` = `[address 1–512, value 0–255]`, unique addresses.
   Unlisted channels are 0, so the converter drops zeros.
 - `label` ≤ 6 printable ASCII chars, no `.` (it would merge into a decimal point).
+- `name` (the QLC+ scene name) and the optional top-level `fixtures` list
+  (`[{"name", "address" 1-based, "channels"}]`) are **display only**, for the OLED.
+  The firmware skips bad fixture entries and never rejects scenes over them, and
+  older firmware ignores the key, so adding it didn't need a version bump.
 - **Changing the format means:** bump `kSceneFormatVersion` and `FORMAT_VERSION`
   together, update both parsers, update both test suites.
   `validate_document()` in the converter mirrors the firmware's `parseScenes()`
@@ -89,6 +98,17 @@ Shared contract between `lib/scenelogic` (firmware) and `tools/qxw_to_scenes.py`
   `CONFIG_LITTLEFS_*` sdkconfig values). If the framework's LittleFS config changes,
   the box will boot "FS Err" on uploaded images: re-check against the pio-built
   `littlefs.bin` (`tools/tests/test_minidesk_flash.py` shows how).
+
+## OLED (0.42" SSD1306 on the C3 board)
+
+Lessons from `../lightswing` (OLED.md there has the full story):
+- **SSD1306, never SH110X.** `begin(SSD1306_SWITCHCAPVCC, 0x3C, false, false)` after
+  `Wire.begin(5, 6)`. SH110X sends the wrong charge-pump command: every call
+  succeeds and the screen stays black.
+- **Power-cycle to test a dark panel.** A reset after flashing keeps the charge pump
+  running, which hides a wrong driver until the next cold power-up.
+- Geometry (`include/oled_panel.h`): 72×40 glass at controller columns 28–99, rows
+  24–63 unrotated. Build with `-D OLED_INVERTED=1` if the board is mounted upside down.
 
 ## Fixture notes (Dual-head-Laser2.qxf, 10 channels)
 
@@ -104,6 +124,9 @@ Shared contract between `lib/scenelogic` (firmware) and `tools/qxw_to_scenes.py`
 - [ ] What the laser does on DMX signal loss (hold last / blank / auto mode).
 - [ ] RS485 auto-direction module gives glitch-free output for an hour, compared
       against the USB-DMX adaptor on the same scene.
+- [x] OLED status screen on this board: geometry (borrowed from lightswing),
+      orientation, and survives a cold power-up. Checked 2026-10-16; DMX holds
+      40 frames/s with it running, slowest push 10.2 ms.
 - [x] LED&KEY board works reliably at 3V3 (brightness acceptable). Bench-checked
       2026-10-16: all 8 buttons, display, LEDs, and DIO-pull fault detection.
 - [x] ESP32-C3 build with the pioarduino platform (flashed and running 2026-10-16:
@@ -129,6 +152,8 @@ python3 tools/minidesk_uploader.py                  # same, as an app
 ```
 src/main.cpp             panel, state, display; wiring of everything
 src/dmx_tx.*             DMX transmit (ESP-only)
+src/oled_status.*        0.42" OLED status screen (display only)
+include/oled_panel.h     OLED glass window geometry
 include/config.h         pins and tunables
 lib/scenelogic/          hardware-free logic: scene parsing, debounce, display text
 test/test_scenelogic/    Unity tests for scenelogic (native)

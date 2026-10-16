@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 // ESP32-C3. Keep 2, 8, 9 (strapping) free of anything that could be held at boot.
-// 5/6 are the onboard 0.42" OLED's I2C on that board variant (unused in v1).
+// 5/6 are the onboard 0.42" OLED's I2C.
 constexpr int PIN_TM_STB = 3;
 constexpr int PIN_TM_CLK = 4;
 constexpr int PIN_TM_DIO = 10;   // needs 10k pull-up to 3V3 (TM1638 DIO is open-drain)
@@ -28,3 +28,13 @@ constexpr uint32_t HEARTBEAT_MS = 250;
 // Scenes
 constexpr const char* SCENES_PATH = "/scenes.json";
 constexpr size_t SCENES_MAX_BYTES = 48 * 1024;
+
+// Onboard 0.42" SSD1306 OLED (status only; see src/oled_status.h, include/oled_panel.h)
+constexpr int PIN_OLED_SDA = 5;
+constexpr int PIN_OLED_SCL = 6;
+constexpr uint8_t OLED_I2C_ADDR = 0x3C;
+constexpr uint32_t OLED_I2C_HZ = 400000;
+constexpr uint16_t OLED_I2C_TIMEOUT_MS = 5;  // a stuck bus can't hold the loop for long
+constexpr uint32_t OLED_DRAW_MS = 100;       // 10 Hz
+constexpr uint32_t OLED_RETRY_MS = 3000;     // missing panel: probe this often
+constexpr uint32_t OLED_FIXTURE_CYCLE_MS = 4000;  // several fixtures: show each this long

@@ -13,9 +13,10 @@ Nothing is written if there are any errors. Exit code 1 on error.
 Format v1 (must match lib/scenelogic):
     {"version": 1, "source": "...", "scenes": [
         {"button": 1, "label": "Tunnel", "name": "1 Tunnel", "values": [[1, 64], [2, 200]]}
-    ]}
+    ], "fixtures": [{"name": "Dual head Laser", "address": 1, "channels": 10}]}
 values are [DMX address 1-512, value 0-255]; channels not listed are 0, so zeros
-are dropped from the output.
+are dropped from the output. "fixtures" (optional, display only) lists the patched
+fixtures the scenes use, for the box's OLED.
 """
 from __future__ import annotations
 
@@ -51,6 +52,7 @@ class Fixture:
 @dataclass
 class Result:
     scenes: list[dict] = field(default_factory=list)
+    fixtures: list[dict] = field(default_factory=list)  # display only
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -108,7 +110,9 @@ def parse_fixtures(engine: ET.Element, res: Result) -> dict[int, Fixture]:
     return fixtures
 
 
-def convert_scene(func: ET.Element, fixtures: dict[int, Fixture], res: Result) -> dict | None:
+def convert_scene(
+    func: ET.Element, fixtures: dict[int, Fixture], res: Result, used: set[int] | None = None
+) -> dict | None:
     name = func.get("Name", "")
     m = NAME_RE.match(name)
     if not m:
@@ -178,6 +182,8 @@ def convert_scene(func: ET.Element, fixtures: dict[int, Fixture], res: Result) -
             owner[addr] = fx.name
     if not ok:
         return None
+    if used is not None:
+        used.update(fixtures[int(fv.get("ID"))].id for fv in _children(func, "FixtureVal") if (fv.text or "").strip())
 
     label, changed = sanitise_label(m.group(2))
     if changed:
@@ -211,10 +217,11 @@ def convert_workspace(path: Path) -> Result:
 
     fixtures = parse_fixtures(engine, res)
     seen: dict[int, str] = {}
+    used: set[int] = set()
     for func in _children(engine, "Function"):
         if func.get("Type") != "Scene":
             continue
-        scene = convert_scene(func, fixtures, res)
+        scene = convert_scene(func, fixtures, res, used)
         if scene is None:
             continue
         b = scene["button"]
@@ -225,6 +232,10 @@ def convert_workspace(path: Path) -> Result:
         res.scenes.append(scene)
 
     res.scenes.sort(key=lambda s: s["button"])
+    res.fixtures = [
+        {"name": f.name, "address": f.address + 1, "channels": f.channels}
+        for f in sorted((fixtures[i] for i in used), key=lambda f: f.address)
+    ]
     if not res.scenes and not res.errors:
         res.warnings.append("no numbered scenes found; the box will only ever be BLANK")
     return res
@@ -272,10 +283,24 @@ def validate_document(doc: object) -> list[str]:
                 problems.append(f"{where}: duplicate address {a}")
                 break
             addrs.add(a)
+
+    fixtures = doc.get("fixtures", [])
+    if not isinstance(fixtures, list):
+        problems.append("'fixtures' must be a list")
+        fixtures = []
+    for i, f in enumerate(fixtures):
+        # Display only: the firmware skips bad entries rather than rejecting scenes.
+        ok = (
+            isinstance(f, dict)
+            and isinstance(f.get("name"), str)
+            and all(isinstance(f.get(k), int) and not isinstance(f.get(k), bool) for k in ("address", "channels"))
+        )
+        if not ok or not 1 <= f["address"] <= DMX_SLOTS or not 1 <= f["channels"] <= DMX_SLOTS:
+            problems.append(f"fixtures[{i}]: needs name, address 1-{DMX_SLOTS}, channels 1-{DMX_SLOTS}")
     return problems
 
 
-def render_json(source: str, scenes: list[dict]) -> str:
+def render_json(source: str, scenes: list[dict], fixtures: list[dict] | None = None) -> str:
     """One scene per block, values on one line, so diffs stay readable."""
     lines = ["{", f'  "version": {FORMAT_VERSION},', f'  "source": {json.dumps(source)},', '  "scenes": [']
     for i, s in enumerate(scenes):
@@ -288,7 +313,14 @@ def render_json(source: str, scenes: list[dict]) -> str:
             f'      "values": {json.dumps(s["values"], separators=(",", ":"))}',
             "    }" + sep,
         ]
-    lines += ["  ]", "}", ""]
+    lines.append("  ]," if fixtures else "  ]")
+    if fixtures:
+        lines.append('  "fixtures": [')
+        for i, f in enumerate(fixtures):
+            sep = "," if i < len(fixtures) - 1 else ""
+            lines.append(f"    {json.dumps(f)}{sep}")
+        lines.append("  ]")
+    lines += ["}", ""]
     return "\n".join(lines)
 
 
@@ -331,7 +363,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{len(res.errors)} error(s); {args.output} not written", file=sys.stderr)
         return 1
 
-    text = render_json(args.workspace.name, res.scenes)
+    text = render_json(args.workspace.name, res.scenes, res.fixtures)
     problems = validate_document(json.loads(text))  # belt and braces
     if problems:
         for p in problems:

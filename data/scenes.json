@@ -14,5 +14,8 @@
       "name": "2 Lines",
       "values": [[33,64],[34,177],[35,120],[36,116],[37,153],[38,109],[39,109]]
     }
+  ],
+  "fixtures": [
+    {"name": "Dual head Laser", "address": 33, "channels": 10}
   ]
 }

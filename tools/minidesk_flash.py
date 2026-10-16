@@ -93,7 +93,7 @@ def convert(qxw: Path) -> Converted:
     errors = list(res.errors)
     text = None
     if not errors:
-        text = conv.render_json(qxw.name, res.scenes)
+        text = conv.render_json(qxw.name, res.scenes, res.fixtures)
         errors += [f"internal: {p}" for p in conv.validate_document(json.loads(text))]
         if len(text.encode()) > SCENES_MAX_BYTES:
             errors.append(f"scenes.json is {len(text.encode())} bytes; the box accepts at most {SCENES_MAX_BYTES}")

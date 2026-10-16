@@ -28,6 +28,7 @@ class DmxTx {
   bool ok() const { return ok_; }
   bool stalled() const;
   uint32_t framesSent() const { return frames_; }
+  const uint8_t* slots() const { return &buf_[1]; }  // [0] = address 1, as sent
 
  private:
   uart_port_t port_ = UART_NUM_1;

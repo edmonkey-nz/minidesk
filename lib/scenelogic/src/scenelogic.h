@@ -15,16 +15,29 @@ constexpr uint8_t kMaxSceneButton = 7;    // scenes live on buttons 1..7
 constexpr uint8_t kLabelMax = 6;          // "1 " + 6 chars fills the 8-digit display
 constexpr uint8_t kMaxSimultaneousPresses = 2;  // more than this = panel fault
 constexpr int kSceneFormatVersion = 1;    // must match tools/qxw_to_scenes.py
+constexpr uint8_t kNameMax = 24;          // scene and fixture names, for the OLED
+constexpr uint8_t kMaxFixtures = 8;
 
 struct Scene {
   bool present = false;
   char label[kLabelMax + 1] = {};
+  char name[kNameMax + 1] = {};   // full QLC+ scene name, display only
   uint8_t frame[kDmxSlots] = {};  // frame[0] = DMX address 1. Unset channels are 0.
+};
+
+// Patched fixture, from the optional "fixtures" list. Display only: it never
+// changes what is sent.
+struct FixtureInfo {
+  char name[kNameMax + 1] = {};
+  uint16_t address = 0;   // 1-based start address
+  uint16_t channels = 0;  // address + channels - 1 <= 512
 };
 
 struct SceneSet {
   Scene scenes[kMaxSceneButton + 1];  // index 1..7 used, 0 unused
   uint8_t loaded = 0;
+  FixtureInfo fixtures[kMaxFixtures];
+  uint8_t fixtureCount = 0;
   void clear();
 };
 
@@ -50,6 +63,9 @@ LoadReport parseScenes(const char* json, size_t len, SceneSet& out);
 
 // Keep printable ASCII (no '.'), truncate to kLabelMax.
 void sanitiseLabel(const char* in, char out[kLabelMax + 1]);
+
+// Keep printable ASCII, truncate to kNameMax.
+void sanitiseName(const char* in, char out[kNameMax + 1]);
 
 // Edge-detecting debouncer for the TM1638 button byte (bit0 = S1 ... bit7 = S8).
 class ButtonDebouncer {
@@ -84,5 +100,14 @@ void formatSceneText(char out[9], uint8_t button, const char* label);
 void formatStatus(char out[9], const char* text);
 
 uint8_t popcount8(uint8_t v);
+
+// --- OLED helpers ---
+
+// Horizontal offset (<= 0) for text `textPx` wide in a `windowPx` window, so long
+// text pauses, scrolls 1 px per tick, pauses, then jumps back. 0 if it fits.
+int16_t marqueeOffset(uint16_t textPx, uint16_t windowPx, uint32_t tick, uint8_t pauseTicks);
+
+// Bar height for a DMX value, 0..maxPx. Any non-zero value gets at least 1 px.
+uint8_t barHeight(uint8_t value, uint8_t maxPx);
 
 }  // namespace scenelogic

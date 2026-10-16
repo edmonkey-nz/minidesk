@@ -125,3 +125,28 @@ def test_validate_document_catches_firmware_rejections():
     }
     assert len(q.validate_document(bad)) == 5
     assert q.validate_document({"version": 2, "scenes": []})
+
+
+def test_fixtures_listed_for_display():
+    res = q.convert_workspace(SAMPLE)
+    # only fixtures a scene actually uses, by address, 1-based
+    assert [f["address"] for f in res.fixtures] == sorted(f["address"] for f in res.fixtures)
+    assert all(1 <= f["address"] <= 512 and f["channels"] >= 1 for f in res.fixtures)
+    assert "Dual head Laser" in [f["name"] for f in res.fixtures]
+    doc = json.loads(q.render_json("sample.qxw", res.scenes, res.fixtures))
+    assert doc["fixtures"] == res.fixtures
+    assert q.validate_document(doc) == []
+
+
+def test_unused_fixture_not_listed(tmp_path):
+    fixtures = """
+  <Fixture><ID>0</ID><Name>Used</Name><Universe>0</Universe><Address>0</Address><Channels>4</Channels></Fixture>
+  <Fixture><ID>1</ID><Name>Idle</Name><Universe>0</Universe><Address>10</Address><Channels>4</Channels></Fixture>"""
+    res = q.convert_workspace(workspace(tmp_path, scene("1 X", (0, "0,64")), fixtures))
+    assert res.fixtures == [{"name": "Used", "address": 1, "channels": 4}]
+
+
+def test_bad_fixtures_reported():
+    doc = {"version": 1, "scenes": [], "fixtures": [{"name": "A", "address": 0, "channels": 4}, "x"]}
+    assert len(q.validate_document(doc)) == 2
+    assert q.validate_document({"version": 1, "scenes": []}) == []  # fixtures optional
