@@ -78,3 +78,16 @@ def test_load_summary():
     lines = ["[scene] BLANK (boot)", "[dmx] ok, 512 slots", "[load] 2 SCEnES (loaded 2, rejected 0)"]
     assert mf.load_summary(lines) == "2 SCEnES (loaded 2, rejected 0)"
     assert mf.load_summary([]) is None
+
+
+def test_logger_survives_a_second_flash():
+    """esptool 5.6 can't re-install a logger; the app's second upload used to die
+    with "'_LegacyLoggerAdapter' object has no attribute 'set_logger'"."""
+    pytest.importorskip("esptool")
+    from esptool.logger import log as esplog
+
+    first, second = [], []
+    mf._install_logger(first.append)
+    mf._install_logger(second.append)
+    esplog.print("hello")
+    assert first == [] and second == ["hello"]

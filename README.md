@@ -1,15 +1,24 @@
 # minidesk
 
-A pocket DMX controller that recalls up to seven static scenes, plus a hard-wired BLANK button. It works with any DMX fixtures on one universe; it was built for (and is tested with) a dual-head DMX laser.
-It's an ESP32-C3 with a TM1638 "LED&KEY" panel and a TTL-to-RS485 module. Scenes are authored in QLC+ and converted to a JSON file on the C3's flash.
+[![release](https://img.shields.io/github/v/release/edmonkey-nz/minidesk?color=blueviolet)](https://github.com/edmonkey-nz/minidesk/releases)
+[![license](https://img.shields.io/badge/license-MIT-green)](#licence)
+![firmware](https://img.shields.io/badge/firmware-ESP32--C3-informational)
+![uploader](https://img.shields.io/badge/uploader-Linux%20%7C%20Windows%20%7C%20macOS-informational)
+[![build](https://github.com/edmonkey-nz/minidesk/actions/workflows/release.yml/badge.svg)](https://github.com/edmonkey-nz/minidesk/actions/workflows/release.yml)
+![ai-code](https://img.shields.io/badge/AI%20coded-YES-orange)
 
-```
- [ 1 Tunnel ]   <- 8-digit display: scene number + label; last decimal point = DMX heartbeat
- o o o o o o o o <- LED above the active button
- 1 2 3 4 5 6 7 8 <- 1–7 scenes, 8 = BLANK
-```
+A pocket DMX controller that recalls up to seven static scenes, plus a hard-wired BLANK button. It works with any DMX fixtures on one universe.
 
-Read `CLAUDE.md` for the hard constraints (output safety, never block, pin rules).
+It's an ESP32-C3 with a TM1638 "LED&KEY" panel and a TTL-to-RS485 module and a cheap wireless DMX transmitter. 
+
+1) Build the simple circuit below, if you don't want need the wireless you can easily replace this with a 3/5 pin DMX plug.
+2) Load your project (.qxw) file from QLC+ into the custom upload tool.
+3) Choose which of your scene files maps to each button (1-7) - button 8 is reserved as a 'blank' (assuming 0 values mean stop on your fixtures).
+4) Flash your ESP32 over USB. 
+5) Check and play!
+
+Why: I lend out my lights and lasers and needed a easy hardware solution for people to use. I use the awesome QLC+ on my laptop, but this isn't a turnkey solution for a party at a house or local hall. These are parts I had around, maybe future versions could have more buttons and OLED display!
+
 
 ## Parts
 
@@ -17,56 +26,41 @@ Read `CLAUDE.md` for the hard constraints (output safety, never block, pin rules
 - TM1638 LED&KEY module (8 buttons, 8 LEDs, 8× 7-seg)
 - TTL to RS485 module (auto-direction type, e.g. ePartners TP2003), or a MAX3485 breakout
 - 2 × 10k resistors
-- XLR female: 3-pin, or 5-pin if your fixtures use it (pins 1–3 are the same)
+- 2.4 GHz wireless DMX module (C9 "2 in 1" transmitter/receiver PCB) as the transmitter, plus matching receivers at the fixtures. The box has no DMX socket: output goes only to the transmitter.
 
 
 ## Wiring
 
 ![Wiring diagram](docs/wiring.png)
 
-Source: [docs/wiring.html](docs/wiring.html) (re-render command at the top of the file).
+Source: [docs/wiring.html](docs/wiring.html) 
 
 | From | To | Notes |
 |---|---|---|
 | C3 3V3 | TM1638 VCC, RS485 VCC | **3.3 V only for the TM1638** |
-| C3 GND | TM1638 GND, RS485 GND, XLR pin 1 | |
+| C3 5V | Transmitter V+ | USB 5 V |
+| C3 GND | TM1638 GND, RS485 GND, transmitter GND and DMX1 | |
 | GPIO 3 | TM1638 STB | |
 | GPIO 4 | TM1638 CLK | |
 | GPIO 10 | TM1638 DIO | 10k pull-up to 3V3 |
 | GPIO 7 | RS485 TXD | 10k pull-up to 3V3 |
 | — | RS485 RXD | leave unconnected |
-| RS485 A+ | XLR pin 3 (Data+) | |
-| RS485 B− | XLR pin 2 (Data−) | swap A/B first if nothing responds |
+| RS485 A+ | Transmitter DMX3 (Data+) | |
+| RS485 B− | Transmitter DMX2 (Data−) | swap A/B first if nothing responds |
 | — | RS485 Earth terminal | leave unconnected |
 
-Power the C3 from USB-C. Fixtures have their own supplies.
+Power the C3 from USB-C; it also powers the transmitter. Fixtures have their own supplies. Set the module to transmit with its button, then pair the receivers.
 
-## Making scenes
-
-1. **Fixture definitions.** If QLC+ doesn't already know a fixture, put its `.qxf` in `qlc/fixtures/` and copy it into your QLC+ user fixtures folder (`~/.qlcplus/fixtures/` on Linux; see the QLC+ docs for Windows and macOS). Restart QLC+.
-2. **Patch your fixtures** in QLC+ on universe 1, at the addresses set on the fixtures, with your USB-DMX adaptor as the output.
-3. **Build scenes while watching the fixtures.** Name each with its button number first: `1 Tunnel`, `2 Warm wash` and so on. Only buttons 1–7 can be used. Anything without a leading number is ignored, so scratch scenes are fine.
-   - **Set every channel the look needs.** Channels a scene doesn't set are sent as 0, so include mode, shutter and master-dimmer channels.
-   - **Only the stored scene values are sent.** QLC+'s grand master, channel modifiers and fades aren't. Build looks with the grand master at full.
-   - Per-fixture tips are in `CLAUDE.md` under "Fixture notes". For example, the Dual head Laser needs CH1 (Run mode) at 64–127, or it ignores its other channels.
-4. **Save the workspace** into `qlc/`, e.g. `qlc/show.qxw`.
-5. **Upload** with the uploader app (below), or by hand with steps 6 and 7.
-6. **Convert:**
-   ```bash
-   python3 tools/qxw_to_scenes.py qlc/show.qxw -o data/scenes.json
-   ```
-   This prints a summary and refuses to write anything if there are errors (duplicate buttons, button 8, address clashes, universe 2+).
-7. **Flash the scenes:** `pio run -t uploadfs`. Firmware doesn't need rebuilding for scene changes.
-
-**Make sure your fixtures are safe when DMX stops before uploading, whichever way you
-do it.** The box sends no DMX while it is being written to. Fixtures react
-differently: some go dark (the Dual head Laser does), some hold their last look, and
-some start an auto or sound mode. Power lasers off unless you've tested them.
+**Wireless and fail-BLANK:** many 2.4 GHz receivers hold the last frame when the link drops, so a fixture behind one may stay lit after the box stops sending. Test DMX loss through the link (switch the box off mid-scene) before using it with a laser.
 
 ## Uploader app
 
 `minidesk-uploader` is a small window for Linux, Windows and macOS: choose the `.qxw`,
-check the scene list, tick "fixtures are safe if DMX stops", press **Upload scenes**. It runs the same
+pick scenes for buttons, tick "fixtures are safe if DMX stops", press **Upload scenes**.
+To pick, select scenes in the list (filter by name) and press 1–7 or click a number; press
+the same number again to take them off. Double-click a button in the lower table to set what the box displays.
+Scenes named with a number first start on that button. Picks are remembered for each workspace.
+It runs the same
 converter, refuses to upload if there are errors, finds the box on USB by itself, and
 reads the box's boot log afterwards to confirm how many scenes it loaded.
 **Install firmware + scenes** sets up a new box; no PlatformIO needed.
@@ -79,33 +73,6 @@ The builds aren't signed, so:
 - **Linux:** `chmod +x minidesk-uploader-linux`. You need to be in the `dialout` group
   (`sudo usermod -aG dialout $USER`, then log out and in).
 
-From source, or headless:
-
-```bash
-pip install -r tools/requirements-uploader.txt
-python3 tools/minidesk_uploader.py                 # the app
-python3 tools/minidesk_flash.py qlc/show.qxw       # same thing, command line
-```
-
-Releases are built by `.github/workflows/release.yml`: push a tag like `v1.0.0`.
-To build for your own OS: `pio run -e c3 && python3 tools/build_uploader.py` (needs `pyinstaller`).
-
-The display labels are the first 6 characters after the number. Seven-segment can't draw some letters well (M, W, K, X, V), so choose labels you can read.
-
-## OLED status screen
-
-The C3 board's little OLED shows what the box is doing, at 10 frames a second:
-
-```
- 1 Eyes            <- scene name; white bar = a scene is live. Otherwise BLANK or a status
- Dual head Laser   <- fixture (scrolls if long; cycles if there are several)
- 33-42       40Hz  <- its DMX addresses, and DMX frames per second
- ▌▌▌▌▌▌▌ _ _ _ ::  <- live value of each channel as it goes out | held buttons
-               -=- <-                                          | TX: sweeps while sending
-```
-
-Fixture names come from the QLC+ workspace, so re-convert older `scenes.json` files to
-get them. Without a fixture list it shows 12 channels from the first non-zero one.
 
 ## Boot messages
 
@@ -134,22 +101,18 @@ Every one of these leaves the box in BLANK.
 
 The decimal point on the last digit and the onboard LED blink only while DMX frames are actually going out.
 
-## New fixture checklist
+Shout outs to Massimo Callegari and supporters of https://qlcplus.org/
 
-Do this once for each new fixture before trusting it in a show:
+## Licence
 
-1. Send a scene from QLC+ through the USB-DMX adaptor, then the same scene from the box. They should look identical.
-2. **Press 8 (BLANK).** Every channel goes to 0. Check that's actually dark for this fixture: moving heads swing to pan/tilt home, and some fixtures pick an auto or sound mode at 0.
-3. **Pull the DMX cable while a scene is running**, and note whether the fixture goes dark, holds, or starts an auto mode.
-4. Record the results in `CLAUDE.md` under "Fixture notes".
+The source in this repo is MIT: see [LICENSE](LICENSE).
 
-If output ever glitches or a fixture jumps to another mode, run a scene for an hour against the USB-DMX adaptor. If the glitches show up there too, swap the RS485 module for a MAX3485 with DE tied high.
+The release downloads are built with GPL code, so they are distributed under
+[GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html):
 
-## Development
+- the firmware links [TM1638plus](https://github.com/gavinlyonsrepo/TM1638plus) (GPL-3.0);
+- the uploader app bundles [esptool](https://github.com/espressif/esptool) (GPL-2.0-or-later).
 
-```bash
-pio run && pio run -t upload        # firmware
-pio test -e native                  # scene parsing/debounce tests on your PC
-python3 -m pytest tools/tests -q    # converter + uploader tests (pip install pytest, plus
-                                    # tools/requirements-uploader.txt for the uploader ones)
-```
+Their full source is this repo plus those libraries, at the versions in `platformio.ini`
+and `tools/requirements-uploader.txt`. Other parts: Arduino-ESP32 (LGPL-2.1), ArduinoJson
+(MIT), Adafruit SSD1306 and GFX (BSD), littlefs-python (BSD-3), pyserial (BSD-3).

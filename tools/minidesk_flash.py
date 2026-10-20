@@ -4,6 +4,7 @@
 This is the engine behind the minidesk uploader app, and a CLI in its own right:
 
     python3 tools/minidesk_flash.py qlc/show.qxw                 # upload scenes
+    python3 tools/minidesk_flash.py party.qxw --scene "1=Laser-hzLines" --scene "2=#45"  # pick scenes
     python3 tools/minidesk_flash.py qlc/show.qxw --firmware fw.bin  # new box: firmware too
     python3 tools/minidesk_flash.py --list-ports
 
@@ -88,9 +89,10 @@ class Converted:
     json_text: str | None  # None when there are errors
 
 
-def convert(qxw: Path) -> Converted:
-    """Run the converter. Any error means json_text is None and nothing may be written."""
-    res = conv.convert_workspace(qxw)
+def convert(qxw: Path, assignments: list[conv.Assignment] | None = None) -> Converted:
+    """Run the converter. Any error means json_text is None and nothing may be written.
+    With assignments, only those scenes are used (see qxw_to_scenes.convert_assigned)."""
+    res = conv.convert_workspace(qxw, assignments)
     errors = list(res.errors)
     text = None
     if not errors:
@@ -158,39 +160,51 @@ def list_ports() -> list[Port]:
 # --- flashing -----------------------------------------------------------------------
 
 
+_esp_logger = None  # installed once per process, see _install_logger
+
+
 def _install_logger(log: Log) -> None:
-    from esptool.logger import TemplateLogger, log as esplog
+    """Send esptool's output to `log`. esptool 5.6 wraps the installed logger in an
+    adapter that has no set_logger(), so installing a second time (the app's second
+    upload) raises AttributeError. Install once; later calls just swap the sink."""
+    global _esp_logger
+    if _esp_logger is None:
+        from esptool.logger import TemplateLogger, log as esplog
 
-    class _Logger(TemplateLogger):
-        _last_pct = -1
+        class _Logger(TemplateLogger):
+            sink: Log = print
+            _last_pct = -1
 
-        def print(self, *args, **kwargs):
-            msg = " ".join(str(a) for a in args).rstrip()
-            if msg:
-                log(msg)
+            def print(self, *args, **kwargs):
+                msg = " ".join(str(a) for a in args).rstrip()
+                if msg:
+                    self.sink(msg)
 
-        def note(self, message):
-            log(f"Note: {message}")
+            def note(self, message):
+                self.sink(f"Note: {message}")
 
-        def warning(self, message):
-            log(f"Warning: {message}")
+            def warning(self, message):
+                self.sink(f"Warning: {message}")
 
-        def error(self, message):
-            log(f"Error: {message}")
+            def error(self, message):
+                self.sink(f"Error: {message}")
 
-        def stage(self, finish=False):
-            pass
+            def stage(self, finish=False):
+                pass
 
-        def progress_bar(self, cur_iter, total_iters, prefix="", suffix="", bar_length=30):
-            pct = int(100 * cur_iter / total_iters) if total_iters else 100
-            if pct // 10 != self._last_pct // 10 or pct == 100:
-                self._last_pct = pct
-                log(f"{prefix.strip()} {pct}%")
+            def progress_bar(self, cur_iter, total_iters, prefix="", suffix="", bar_length=30):
+                pct = int(100 * cur_iter / total_iters) if total_iters else 100
+                if pct // 10 != self._last_pct // 10 or pct == 100:
+                    self._last_pct = pct
+                    self.sink(f"{prefix.strip()} {pct}%")
 
-        def set_verbosity(self, verbosity):
-            pass
+            def set_verbosity(self, verbosity):
+                pass
 
-    esplog.set_logger(_Logger())
+        _esp_logger = _Logger()
+        esplog.set_logger(_esp_logger)
+    _esp_logger.sink = log
+    _esp_logger._last_pct = -1
 
 
 def _write(port: str, log: Log, plan: Callable[[object], list[tuple[int, bytes]]]) -> None:
@@ -295,6 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--firmware", type=Path, help="also install this merged firmware image (firmware.factory.bin)")
     ap.add_argument("--yes", action="store_true", help="don't ask to confirm fixtures are safe without DMX")
     ap.add_argument("--list-ports", action="store_true")
+    conv.add_pick_args(ap)
     args = ap.parse_args(argv)
 
     if args.list_ports:
@@ -304,7 +319,13 @@ def main(argv: list[str] | None = None) -> int:
     if not args.workspace:
         ap.error("give a .qxw workspace")
 
-    c = convert(args.workspace)
+    assignments, pick_errors = conv.picks_from_args(args)
+    for e in pick_errors:
+        print(f"error: {e}", file=sys.stderr)
+    if pick_errors:
+        print("nothing uploaded", file=sys.stderr)
+        return 1
+    c = convert(args.workspace, assignments)
     for w in c.warnings:
         print(f"warning: {w}", file=sys.stderr)
     for e in c.errors:

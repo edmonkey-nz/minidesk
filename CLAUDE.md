@@ -67,8 +67,10 @@ practice: the safe failure state here is **BLANK**.
   line when TX is low; mark/idle is held by bias resistors. At 250 kbaud this is
   marginal. If output glitches, swap to a MAX3485/SP3485 breakout with DE tied
   high. No firmware change needed. RXD unconnected. Earth terminal unconnected.
-- DMX: XLR pin 1 → GND, pin 2 → B−, pin 3 → A+. Swap A/B first if no response.
-  Some fixtures (the Dual head Laser) use 5-pin XLR: pins 1–3 are the same as 3-pin.
+- DMX goes out only over a 2.4 GHz wireless transmitter (C9 module, powered
+  from the C3's 5V pin); the box has no XLR. RS485 A+ → DMX3, B− → DMX2,
+  GND → DMX1. Swap A/B first if no response. At the receiver end, XLR pin 1 is
+  GND, 2 is Data−, 3 is Data+; the Dual head Laser uses 5-pin XLR (pins 1–3 the same).
 
 ## DMX driver
 
@@ -90,7 +92,8 @@ Shared contract between `lib/scenelogic` (firmware) and `tools/qxw_to_scenes.py`
 - `button` 1–7. `values` = `[address 1–512, value 0–255]`, unique addresses.
   Unlisted channels are 0, so the converter drops zeros.
 - `label` ≤ 6 printable ASCII chars, no `.` (it would merge into a decimal point).
-- `name` (the QLC+ scene name) and the optional top-level `fixtures` list
+- `name` (the QLC+ scene name; for a button built from several picked scenes,
+  their names joined with " + ") and the optional top-level `fixtures` list
   (`[{"name", "address" 1-based, "channels"}]`) are **display only**, for the OLED.
   The firmware skips bad fixture entries and never rejects scenes over them, and
   older firmware ignores the key, so adding it didn't need a version bump.
@@ -139,6 +142,11 @@ Per-fixture results (BLANK, DMX loss) are under "Fixture notes". The uploader's
       against the USB-DMX adaptor on the same scene. **Deferred by choice
       (2026-10-16):** fine in use so far. If output glitches or a fixture jumps to
       another mode, do this test, then swap to a MAX3485 with DE tied high.
+- [ ] 2.4 GHz wireless DMX (C9 module, the only output since 2026-10-20): BLANK
+      reaches the fixture through the link, and on DMX loss (box off, or the
+      transmitter unpowered, mid-scene) the receiver does **not** hold the last
+      frame. Cheap receivers often hold it. Until this passes, don't run a laser
+      over the link.
 - [x] OLED status screen on this board: geometry (borrowed from lightswing),
       orientation, and survives a cold power-up. Checked 2026-10-16; DMX holds
       40 frames/s with it running, slowest push 10.2 ms.
@@ -157,6 +165,7 @@ pio device monitor               # serial log
 pio test -e native               # host tests for lib/scenelogic
 python3 -m pytest tools/tests -q # converter tests
 python3 tools/qxw_to_scenes.py qlc/show.qxw -o data/scenes.json
+python3 tools/qxw_to_scenes.py party.qxw --scene "1=Laser-hzLines" --scene "1=#11"  # pick/merge
 python3 tools/qxw_to_scenes.py --check data/scenes.json
 python3 tools/minidesk_flash.py qlc/show.qxw        # convert + upload over USB
 python3 tools/minidesk_uploader.py                  # same, as an app

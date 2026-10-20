@@ -150,3 +150,114 @@ def test_bad_fixtures_reported():
     doc = {"version": 1, "scenes": [], "fixtures": [{"name": "A", "address": 0, "channels": 4}, "x"]}
     assert len(q.validate_document(doc)) == 2
     assert q.validate_document({"version": 1, "scenes": []}) == []  # fixtures optional
+
+
+# --- picking scenes for buttons (full show files without numbered names) ---
+
+
+def scene_id(sid: int, name: str, *fixture_vals: tuple[int, str], hidden: bool = False) -> str:
+    inner = "".join(f'<FixtureVal ID="{fid}">{vals}</FixtureVal>' for fid, vals in fixture_vals)
+    h = ' Hidden="True"' if hidden else ""
+    return f'<Function ID="{sid}" Type="Scene" Name="{name}"{h}>{inner}</Function>'
+
+
+TWO_FIXTURES = """
+  <Fixture><ID>0</ID><Name>Laser</Name><Universe>0</Universe><Address>0</Address><Channels>4</Channels></Fixture>
+  <Fixture><ID>1</ID><Name>Wash</Name><Universe>0</Universe><Address>10</Address><Channels>4</Channels></Fixture>"""
+
+
+def show(tmp_path) -> Path:
+    fns = (
+        scene_id(0, "Laser-hzLines", (0, "0,100,1,13"))
+        + scene_id(1, "Wash-red", (1, "0,255,3,0"))
+        + scene_id(2, "Wash-blue", (1, "2,255"))
+        + scene_id(3, "New Scene", (0, "0,1"), hidden=True)
+        + scene_id(4, "3 Numbered", (0, "0,50"))
+    )
+    return workspace(tmp_path, fns, TWO_FIXTURES)
+
+
+def test_list_scenes_skips_hidden_and_reads_numbers(tmp_path):
+    scenes, errors = q.list_scenes(show(tmp_path))
+    assert errors == []
+    assert [(s.id, s.name, s.button) for s in scenes] == [
+        (0, "Laser-hzLines", None),
+        (1, "Wash-red", None),
+        (2, "Wash-blue", None),
+        (4, "3 Numbered", 3),
+    ]
+    assert [(f.name, f.dmx_range()) for f in scenes[0].fixtures] == [("Laser", "1-4")]
+    assert [(f.name, f.dmx_range()) for f in scenes[1].fixtures] == [("Wash", "11-14")]
+
+
+def test_scene_fixture_range():
+    assert q.SceneFixture("Spot", 1, 450, 7).dmx_range() == "450-456"
+    assert q.SceneFixture("Dimmer", 1, 9, 1).dmx_range() == "9"
+    assert q.SceneFixture("Far", 2, 1, 4).dmx_range() == "U2 1-4"
+
+
+def test_assigned_scenes_ignore_name_numbers(tmp_path):
+    res = q.convert_workspace(show(tmp_path), [q.Assignment(2, [1])])
+    assert res.errors == []
+    assert [(s["button"], s["name"], s["values"]) for s in res.scenes] == [(2, "Wash-red", [[11, 255]])]
+    assert res.fixtures == [{"name": "Wash", "address": 11, "channels": 4}]
+
+
+def test_merged_button(tmp_path):
+    res = q.convert_workspace(show(tmp_path), [q.Assignment(1, [0, 1], "Mix")])
+    assert res.errors == []
+    (s,) = res.scenes
+    assert s["name"] == "Laser-hzLines + Wash-red"
+    assert s["label"] == "Mix"
+    assert s["values"] == [[1, 100], [2, 13], [11, 255]]
+    assert [f["name"] for f in res.fixtures] == ["Laser", "Wash"]
+
+
+def test_merge_conflict_rejects_button(tmp_path):
+    fns = scene_id(0, "A", (0, "0,10")) + scene_id(1, "B", (0, "0,20")) + scene_id(2, "C", (0, "1,5"))
+    res = q.convert_workspace(workspace(tmp_path, fns, TWO_FIXTURES), [q.Assignment(1, [0, 1]), q.Assignment(2, [2])])
+    assert any("address 1 set to 10 by 'Laser' in 'A' and 20 by 'Laser' in 'B'" in e for e in res.errors)
+    assert [s["button"] for s in res.scenes] == [2]  # the bad button is dropped whole
+
+
+def test_merge_same_value_is_fine(tmp_path):
+    fns = scene_id(0, "A", (0, "0,10,1,5")) + scene_id(1, "B", (0, "0,10"))
+    res = q.convert_workspace(workspace(tmp_path, fns, TWO_FIXTURES), [q.Assignment(1, [0, 1])])
+    assert res.errors == [] and res.scenes[0]["values"] == [[1, 10], [2, 5]]
+
+
+def test_assignment_rules(tmp_path):
+    ws = show(tmp_path)
+    assert any("hard-wired BLANK" in e for e in q.convert_workspace(ws, [q.Assignment(8, [0])]).errors)
+    assert any("1-7" in e for e in q.convert_workspace(ws, [q.Assignment(0, [0])]).errors)
+    assert any("no scene with ID 99" in e for e in q.convert_workspace(ws, [q.Assignment(1, [0, 99])]).errors)
+    empty = q.convert_workspace(ws, [q.Assignment(1, [])])
+    assert empty.errors == [] and empty.scenes == []
+    assert any("no scenes assigned" in w for w in empty.warnings)
+
+
+def test_default_label():
+    assert q.default_label("Laser-hzLines") == "hzLine"
+    assert q.default_label("LED fan - red") == "red"
+    assert q.default_label("1 Tunnel") == "Tunnel"
+    assert q.default_label("Strobe") == "Strobe"
+    assert q.default_label("Laser-8=eyes-wander") == "8=eyes"
+
+
+def test_resolve_picks(tmp_path):
+    scenes, _ = q.list_scenes(show(tmp_path))
+    got, errors = q.resolve_picks(scenes, ["1=Laser-hzLines", "1=#1", "2=Wash-blue"], ["1=Mix"])
+    assert errors == []
+    assert [(a.button, a.scene_ids, a.label) for a in got] == [(1, [0, 1], "Mix"), (2, [2], None)]
+    _, errors = q.resolve_picks(scenes, ["1=Nope", "x=Wash-red"], ["5=Lbl"])
+    assert len(errors) == 3
+
+
+def test_cli_scene_picks(tmp_path):
+    out = tmp_path / "scenes.json"
+    ws = show(tmp_path)
+    assert q.main([str(ws), "-o", str(out), "--scene", "4=Wash-red", "--scene", "4=Laser-hzLines"]) == 0
+    doc = json.loads(out.read_text())
+    assert [s["button"] for s in doc["scenes"]] == [4]  # "3 Numbered" ignored when picking
+    assert q.validate_document(doc) == []
+    assert q.main([str(ws), "-o", str(out), "--scene", "1=Missing"]) == 1

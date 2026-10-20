@@ -8,3 +8,4 @@ __pycache__/
 *.tmp
 build/
 dist/
+.temp/
