@@ -7,9 +7,13 @@
 [![build](https://github.com/edmonkey-nz/minidesk/actions/workflows/release.yml/badge.svg)](https://github.com/edmonkey-nz/minidesk/actions/workflows/release.yml)
 ![ai-code](https://img.shields.io/badge/AI%20coded-YES-orange)
 
-A pocket DMX controller that recalls up to seven static scenes, plus a hard-wired BLANK button. It works with any DMX fixtures on one universe.
+A pocket DMX controller that recalls up to seven static scenes, plus a hard-wired BLANK button. It works with any DMX fixtures on one universe. Theres an uploader tool that flashes the ESP32 with scenes saved in a QLC+ file to make things easy! 
 
-It's an ESP32-C3 with a TM1638 "LED&KEY" panel and a TTL-to-RS485 module and a cheap wireless DMX transmitter. 
+Based on a ESP32-C3 with a TM1638 "LED&KEY" panel and a TTL-to-RS485 module and a cheap wireless DMX transmitter. 
+
+![minidesk prototype device](docs/mini-desk1.jpg)
+
+Why: I lend out my lights and lasers and needed a easy hardware solution for people to use. I use the awesome QLC+ on my laptop, but this isn't a turnkey solution for a party at a house or local hall. These are parts I had around, and was built in an afternoon - maybe future versions could have more buttons and OLED display!
 
 1) Build the simple circuit below, if you don't want need the wireless you can easily replace this with a 3/5 pin DMX plug.
 2) Load your project (.qxw) file from QLC+ into the custom upload tool.
@@ -17,7 +21,7 @@ It's an ESP32-C3 with a TM1638 "LED&KEY" panel and a TTL-to-RS485 module and a c
 4) Flash your ESP32 over USB. 
 5) Check and play!
 
-Why: I lend out my lights and lasers and needed a easy hardware solution for people to use. I use the awesome QLC+ on my laptop, but this isn't a turnkey solution for a party at a house or local hall. These are parts I had around, maybe future versions could have more buttons and OLED display!
+
 
 
 ## Parts
@@ -65,7 +69,10 @@ converter, refuses to upload if there are errors, finds the box on USB by itself
 reads the box's boot log afterwards to confirm how many scenes it loaded.
 **Install firmware + scenes** sets up a new box; no PlatformIO needed.
 
+
 Download it from the [releases page](https://github.com/edmonkey-nz/minidesk/releases).
+![uploader tool](docs/uploader.png)
+
 The builds aren't signed, so:
 
 - **Windows:** SmartScreen warns. Choose "More info", then "Run anyway".
